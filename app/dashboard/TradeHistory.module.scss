@@ -1,0 +1,110 @@
+// Trade History Component Styles
+.empty {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+.historyItem {
+  padding: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.historyItemTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.historySymbol {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.historyPnl {
+  font-weight: 700;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.historyPositive {
+  color: #0a8a43;
+}
+
+.historyNegative {
+  color: #d12b2b;
+}
+
+.historyDetails {
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  padding: 8px 0;
+  
+  &:hover {
+    color: #333;
+  }
+  
+  &[open] {
+    summary {
+      color: #333;
+    }
+  }
+}
+
+.historyDetails[open] > summary {
+  color: #333;
+}
+
+.historyLogs {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logLine {
+  padding: 8px 12px;
+  background: #f8f9fa;
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: monospace;
+  white-space: pre-wrap;
+  color: #333;
+  
+  &:first-child {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+  }
+  
+  &:last-child {
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+  }
+}
+
+.rsGold {
+  color: #c0a610;
+  font-weight: bold;
+}
+
+.cyanTime {
+  color: #0084ff;
+  font-weight: bold;
+}
+
+.plProfit {
+  color: #0a8a43;
+  font-weight: bold;
+}
+
+.plLoss {
+  color: #d12b2b;
+  font-weight: bold;
+}
