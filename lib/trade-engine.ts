@@ -18,7 +18,69 @@ const STRATEGY_URL = process.env.NEXT_PUBLIC_STRATEGY_API_URL!;
 
 const DB_PATH = path.join(process.cwd(), "data", "trades.json");
 
+// Add a symbol to angel-feed active strategy symbols (fire-and-forget)
+function tryAddActiveStrategySymbol(symbol: string) {
+  fetch(`${API_URL}/active-strategy-symbols`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ symbol }),
+  }).catch(() => {});
+}
 
+// Remove a symbol from angel-feed active strategy symbols if no other trade uses it
+function tryRemoveActiveStrategySymbol(symbol: string) {
+  const stillUsed =
+    waitingTrades.some((t) => t.symbol === symbol) ||
+    activeTrades.some((t) => t.symbol === symbol && t.status === "ACTIVE");
+  if (!stillUsed) {
+    fetch(`${API_URL}/active-strategy-symbols`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol }),
+    }).catch(() => {});
+  }
+}
+
+// Full sync: ensure port 2000 activeStrategySymbols matches current waiting+active trades
+async function syncActiveStrategySymbols() {
+  try {
+    const res = await fetch(`${API_URL}/active-strategy-symbols`);
+    const data = await res.json();
+    const current: string[] = Array.isArray(data.symbols) ? data.symbols : [];
+
+    const desired = new Set<string>();
+    for (const t of waitingTrades) desired.add(t.symbol);
+    for (const t of activeTrades) {
+      if (t.status === "ACTIVE") desired.add(t.symbol);
+    }
+
+    // Remove symbols no longer needed
+    for (const sym of current) {
+      if (!desired.has(sym)) {
+        await fetch(`${API_URL}/active-strategy-symbols`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: sym }),
+        }).catch(() => {});
+      }
+    }
+
+    // Add missing symbols
+    for (const sym of desired) {
+      if (!current.includes(sym)) {
+        await fetch(`${API_URL}/active-strategy-symbols`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: sym }),
+        }).catch(() => {});
+      }
+    }
+
+    console.log("[trade-engine] Synced active strategy symbols to feed server:", [...desired]);
+  } catch {
+    // Feed server not running
+  }
+}
 
 type WaitingTrade = {
 
@@ -1531,6 +1593,8 @@ export function addWaitingTrade(trade: WaitingTrade) {
 
   persistState();
 
+  tryAddActiveStrategySymbol(trade.symbol);
+
   ensureEngineRunning();
 
 }
@@ -1600,6 +1664,8 @@ export function cancelWaitingTrade(symbol: string) {
 
   persistState();
 
+  tryRemoveActiveStrategySymbol(symbol);
+
 }
 
 
@@ -1664,6 +1730,8 @@ export function manualExit(symbol: string, exitPrice: string, lastCandleTime: st
 
   persistState();
 
+  tryRemoveActiveStrategySymbol(symbol);
+
 }
 
 
@@ -1673,6 +1741,8 @@ export function removeCompletedTrade(symbol: string) {
   activeTrades = activeTrades.filter((t) => t.symbol !== symbol);
 
   persistState();
+
+  tryRemoveActiveStrategySymbol(symbol);
 
 }
 
@@ -1735,4 +1805,7 @@ export function stopEngine() {
 loadState();
 
 ensureEngineRunning();
+
+// On startup, sync all waiting+active trade symbols to angel-feed server
+syncActiveStrategySymbols();
 
