@@ -1363,11 +1363,11 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
       if (!trailingArmedPositions.has(positionKey)) {
 
-        if (candleClose >= activationLevel) { trailingArmedPositions.add(positionKey); }
+        if (Math.max(candleClose, ltp) >= activationLevel) { trailingArmedPositions.add(positionKey); }
 
       } else {
 
-        if (candleClose <= trailLevel) {
+        if (Math.min(candleClose, ltp) <= trailLevel) {
 
           triggeredPositions.add(positionKey);
 
@@ -1393,15 +1393,19 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
     if (trailingEnabled && trade.trailingTrailActive) {
 
-      if (typeof trade.trailingHighWatermark !== "number" || candleClose > trade.trailingHighWatermark) {
+      const peakPrice = Math.max(candleClose, ltp);
 
-        updateHighWatermark(trade.symbol, candleClose);
+      if (typeof trade.trailingHighWatermark !== "number" || peakPrice > trade.trailingHighWatermark) {
+
+        updateHighWatermark(trade.symbol, peakPrice);
 
       }
 
-      const highMark = trade.trailingHighWatermark ?? candleClose;
+      const highMark = trade.trailingHighWatermark ?? peakPrice;
 
-      const drop = highMark - candleClose;
+      const currentPrice = Math.min(candleClose, ltp);
+
+      const drop = highMark - currentPrice;
 
       if (drop >= trade.trailingAfterTarget) {
 
