@@ -284,6 +284,20 @@ const lastCandleCloseMap: Record<string, number> = {};
 const lastCandleHigh: Record<string, number> = {};
 const lastCandleLow: Record<string, number> = {};
 
+// ─── Sound event queue (consumed by client via polling) ───
+type SoundType = "enter" | "exit" | "profit" | "loss";
+let pendingSoundEvents: SoundType[] = [];
+
+function queueSound(type: SoundType) {
+  pendingSoundEvents.push(type);
+}
+
+export function flushSoundEvents(): SoundType[] {
+  const events = pendingSoundEvents;
+  pendingSoundEvents = [];
+  return events;
+}
+
 // ─── JSON file persistence ───
 
 
@@ -538,6 +552,8 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
   if (!trade) return;
 
+  queueSound("enter");
+
 
 
   const newActive: ActiveTrade = {
@@ -652,9 +668,11 @@ function completeActiveTrade(symbol: string, exitPrice: string, logLine: string)
 
     const newCompletedCycles = trade.completedCycles + 1;
 
-
+    queueSound(cyclePnl >= 0 ? "profit" : "loss");
 
     if (newCompletedCycles >= trade.numberOfTrades) {
+
+      queueSound("exit");
 
       const finalLogs = [
 
@@ -685,6 +703,7 @@ function completeActiveTrade(symbol: string, exitPrice: string, logLine: string)
     // Check max loss/profit immediately after cycle — don't wait for next tick
     if (trade.maxProfitLossEnabled) {
       if (trade.maxLoss > 0 && totalPnl <= -trade.maxLoss) {
+        queueSound("exit");
         const finalLogs = [
           ...trade.logs, logLine,
           `Trade P/L: ${cyclePnl.toFixed(2)}`,
@@ -699,6 +718,7 @@ function completeActiveTrade(symbol: string, exitPrice: string, logLine: string)
         };
       }
       if (trade.maxProfit > 0 && totalPnl >= trade.maxProfit) {
+        queueSound("exit");
         const finalLogs = [
           ...trade.logs, logLine,
           `Trade P/L: ${cyclePnl.toFixed(2)}`,
@@ -731,6 +751,8 @@ function completeActiveTrade(symbol: string, exitPrice: string, logLine: string)
 
 
 function forceExitTrade(symbol: string, exitPrice: string, totalPnl: number, logLine: string) {
+  queueSound(totalPnl >= 0 ? "profit" : "loss");
+  queueSound("exit");
   activeTrades = activeTrades.map((trade) => {
     if (trade.symbol !== symbol || trade.status !== "ACTIVE") return trade;
 
@@ -797,10 +819,14 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
     const newCompletedCycles = trade.completedCycles + 1;
 
+    queueSound(cyclePnl >= 0 ? "profit" : "loss");
+
     const currentTime = logLine.split(" at ").pop() || "";
     const sellLog = `SELL triggered for ₹${exitPrice} at ${currentTime}`;
 
     if (newCompletedCycles >= trade.numberOfTrades) {
+
+      queueSound("exit");
 
       const finalLogs = [
 
@@ -831,6 +857,7 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
     // Check max loss/profit immediately after cycle — don't wait for next tick
     if (trade.maxProfitLossEnabled) {
       if (trade.maxLoss > 0 && totalPnl <= -trade.maxLoss) {
+        queueSound("exit");
         const finalLogs = [
           ...trade.logs, sellLog, logLine,
           `Trade P/L: ${cyclePnl.toFixed(2)}`,
@@ -845,6 +872,7 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
         };
       }
       if (trade.maxProfit > 0 && totalPnl >= trade.maxProfit) {
+        queueSound("exit");
         const finalLogs = [
           ...trade.logs, sellLog, logLine,
           `Trade P/L: ${cyclePnl.toFixed(2)}`,
@@ -879,6 +907,8 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
 
 function updateActiveTradeBuy(symbol: string, entryPrice: string, logLine: string) {
+
+  queueSound("enter");
 
   activeTrades = activeTrades.map((trade) => {
 
@@ -1675,6 +1705,8 @@ export function cancelWaitingTrade(symbol: string) {
 
 
 export function manualExit(symbol: string, exitPrice: string, lastCandleTime: string) {
+
+  queueSound("exit");
 
   activeTrades = activeTrades.map((trade) => {
 
