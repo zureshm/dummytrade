@@ -22,13 +22,11 @@ export function playSound(type: SoundType) {
 
 export function playSoundEvents(events: SoundType[]) {
   if (!events.length) return;
-  // Play only the highest priority sound if multiple fire at once
+  // Play all unique sounds in priority order with a delay between each
   // Priority: loss > profit > exit > enter
   const priority: SoundType[] = ["loss", "profit", "exit", "enter"];
-  for (const p of priority) {
-    if (events.includes(p)) {
-      playSound(p);
-      return;
-    }
-  }
+  const unique = priority.filter((p) => events.includes(p));
+  unique.forEach((type, i) => {
+    setTimeout(() => playSound(type), i * 1500);
+  });
 }
