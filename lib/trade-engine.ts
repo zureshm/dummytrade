@@ -636,6 +636,15 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
   waitingTrades = waitingTrades.filter((t) => t.symbol !== symbol);
 
+  // Reset candle extremes to entry price so stale low/high from the BUY candle
+  // cannot trigger a false SL/Target before the next candle arrives.
+  const ep = Number(entryPrice);
+  if (Number.isFinite(ep)) {
+    lastCandleLow[symbol] = ep;
+    lastCandleHigh[symbol] = ep;
+    lastCandleCloseMap[symbol] = ep;
+  }
+
 }
 
 
@@ -925,6 +934,15 @@ function updateActiveTradeBuy(symbol: string, entryPrice: string, logLine: strin
     };
 
   });
+
+  // Reset candle extremes to entry price so stale low/high from the BUY candle
+  // cannot trigger a false SL/Target before the next candle arrives.
+  const ep = Number(entryPrice);
+  if (Number.isFinite(ep)) {
+    lastCandleLow[symbol] = ep;
+    lastCandleHigh[symbol] = ep;
+    lastCandleCloseMap[symbol] = ep;
+  }
 
 }
 
