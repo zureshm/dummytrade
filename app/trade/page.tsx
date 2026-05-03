@@ -86,7 +86,7 @@ export default function TradePage() {
   const buttonText = isAlreadyActive ? "TRADE RUNNING" : (isAlreadyWaiting ? "UPDATE" : "ENTER");
   const isButtonDisabled = isAlreadyActive;
 
-  const lotSize: number = 65;
+  const lotSize: number = selection?.symbol?.startsWith("SENSEX") ? 20 : 65;
 
   const price = Number(currentPrice || selection?.price || 0);
   const total = price * (lotSize * lotValue);
