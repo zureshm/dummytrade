@@ -222,6 +222,10 @@ type WaitingTrade = {
 
 
 
+  minToHoldTrigger: number;
+
+
+
   trailingAfterTargetEnabled: boolean;
 
 
@@ -335,6 +339,10 @@ type ActiveTrade = {
 
 
   minToHold: number;
+
+
+
+  minToHoldTrigger: number;
 
 
 
@@ -495,6 +503,10 @@ type TradeHistoryItem = {
 
 
     minToHoldEnabled: boolean;
+
+
+
+    minToHoldTrigger?: number;
 
 
 
@@ -986,6 +998,10 @@ function buildConfigSnapshot(trade: ActiveTrade): TradeHistoryItem["config"] {
 
 
 
+    minToHoldTrigger: trade.minToHoldEnabled ? trade.minToHoldTrigger : undefined,
+
+
+
   };
 
 
@@ -1167,6 +1183,10 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
 
     minToHold: trade.minToHold,
+
+
+
+    minToHoldTrigger: trade.minToHoldTrigger,
 
 
 
@@ -2816,7 +2836,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-      const activationLevel = trailLevel + 2;
+      const activationLevel = trailLevel + (trade.minToHoldTrigger || 2);
 
 
 

@@ -36,6 +36,7 @@ export default function TradePage() {
     setWaitAfterSellCandles(defaults.waitAfterSellCandles);
     setMinToHoldEnabled(defaults.minToHoldEnabled);
     setMinToHold(defaults.minToHold);
+    if ('minToHoldTrigger' in defaults) setMinToHoldTrigger((defaults as any).minToHoldTrigger);
     setTrailingAfterTargetEnabled(defaults.trailingAfterTargetEnabled);
     setTrailingAfterTarget(defaults.trailingAfterTarget);
     setRangeEnabled(defaults.rangeEnabled);
@@ -68,6 +69,7 @@ export default function TradePage() {
   const [waitAfterSellCandles, setWaitAfterSellCandles] = useState(8);
   const [minToHoldEnabled, setMinToHoldEnabled] = useState(false);
   const [minToHold, setMinToHold] = useState(8);
+  const [minToHoldTrigger, setMinToHoldTrigger] = useState(2);
   const [isMinToHoldInfoOpen, setIsMinToHoldInfoOpen] = useState(false);
   const [trailingAfterTargetEnabled, setTrailingAfterTargetEnabled] = useState(false);
   const [trailingAfterTarget, setTrailingAfterTarget] = useState(15);
@@ -138,6 +140,7 @@ export default function TradePage() {
       setWaitAfterSellCandles(data.waitAfterSellCandles || 8);
       setMinToHoldEnabled(Boolean(data.minToHoldEnabled ?? false));
       setMinToHold(data.minToHold || 8);
+      setMinToHoldTrigger(data.minToHoldTrigger || 2);
       setTrailingAfterTargetEnabled(Boolean(data.trailingAfterTargetEnabled ?? false));
       setTrailingAfterTarget(data.trailingAfterTarget || 15);
       setRangeEnabled(Boolean(data.rangeEnabled ?? false));
@@ -165,6 +168,7 @@ export default function TradePage() {
       setWaitAfterSellCandles(8);
       setMinToHoldEnabled(false);
       setMinToHold(8);
+      setMinToHoldTrigger(2);
       setTrailingAfterTargetEnabled(false);
       setTrailingAfterTarget(15);
       setRangeEnabled(true);
@@ -197,6 +201,7 @@ export default function TradePage() {
       targetPoints,
       minToHoldEnabled,
       minToHold,
+      minToHoldTrigger,
       waitStrategyEnabled,
       buyOverrideSize,
       waitAfterSellEnabled,
@@ -439,7 +444,7 @@ export default function TradePage() {
                           lineHeight: "18px",
                         }}
                       >
-                        Example: buy at 200 with trailing target 8. Once price hits 208 (trail level) plus 2 more points, we drag the stop loss up to 208 so even if it rallies to 219 and drops back, we still capture those 8 points.
+                        Example: buy at 200 with minimum target 8 and trigger @ {minToHoldTrigger}. Once price hits {200 + 8 + minToHoldTrigger} (208 + {minToHoldTrigger}), we lock the exit at 208. Even if it rallies higher and drops back, you still capture those 8 points.
                       </div>
                     )}
                   </div>
@@ -453,6 +458,15 @@ export default function TradePage() {
                     value={minToHold} 
                     onChange={(e) => setMinToHold(Number(e.target.value) || 0)}
                     className="w-20 h-8"
+                    disabled={!minToHoldEnabled}
+                  />
+                  <label htmlFor="minToHoldTrigger" className={`text-sm ${minToHoldEnabled ? "" : "text-gray-400"}`}>Trigger @</label>
+                  <Input 
+                    id="minToHoldTrigger"
+                    type="number" 
+                    value={minToHoldTrigger} 
+                    onChange={(e) => setMinToHoldTrigger(Number(e.target.value) || 0)}
+                    className="w-16 h-8"
                     disabled={!minToHoldEnabled}
                   />
                 </div>
@@ -675,6 +689,7 @@ export default function TradePage() {
                         targetPoints,
                         minToHoldEnabled,
                         minToHold,
+                        minToHoldTrigger,
                         trailingAfterTargetEnabled,
                         trailingAfterTarget,
                         rangeEnabled,

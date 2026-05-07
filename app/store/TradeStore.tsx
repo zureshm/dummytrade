@@ -21,6 +21,7 @@ export type WaitingTrade = {
   targetPoints: number;
   minToHoldEnabled: boolean;
   minToHold: number;
+  minToHoldTrigger: number;
   trailingAfterTargetEnabled: boolean;
   trailingAfterTarget: number;
   rangeEnabled: boolean;
@@ -51,6 +52,7 @@ export type ActiveTrade = {
   targetPoints: number;
   minToHoldEnabled: boolean;
   minToHold: number;
+  minToHoldTrigger: number;
   trailingAfterTargetEnabled: boolean;
   trailingAfterTarget: number;
   trailingTrailActive: boolean;
@@ -91,6 +93,7 @@ export type TradeHistoryItem = {
     trailingAfterTargetEnabled: boolean;
     minToHold?: number;
     minToHoldEnabled: boolean;
+    minToHoldTrigger?: number;
   };
 };
 
@@ -104,6 +107,7 @@ type TradeConfigSnapshotSource = {
   trailingAfterTarget: number;
   minToHoldEnabled: boolean;
   minToHold: number;
+  minToHoldTrigger: number;
 };
 
 const buildTradeConfigSnapshot = (
@@ -118,6 +122,7 @@ const buildTradeConfigSnapshot = (
   trailingAfterTarget: trade.trailingAfterTargetEnabled ? trade.trailingAfterTarget : undefined,
   minToHoldEnabled: Boolean(trade.minToHoldEnabled),
   minToHold: trade.minToHoldEnabled ? trade.minToHold : undefined,
+  minToHoldTrigger: trade.minToHoldEnabled ? trade.minToHoldTrigger : undefined,
 });
 
 type TradeStoreValue = {
@@ -251,6 +256,7 @@ export function TradeStoreProvider({
         targetPoints: readFormNumber(sym, "targetPoints", 20),
         minToHoldEnabled: readFormBool(sym, "minToHoldEnabled", false),
         minToHold: readFormNumber(sym, "minToHold", 8),
+        minToHoldTrigger: readFormNumber(sym, "minToHoldTrigger", 2),
         trailingAfterTargetEnabled: readFormBool(sym, "trailingAfterTargetEnabled", false),
         trailingAfterTarget: readFormNumber(sym, "trailingAfterTarget", 15),
         rangeEnabled: readFormBool(sym, "rangeEnabled", false),
@@ -322,6 +328,7 @@ export function TradeStoreProvider({
       targetPoints: tradeToActivate.targetPoints,
       minToHoldEnabled: tradeToActivate.minToHoldEnabled,
       minToHold: tradeToActivate.minToHold,
+      minToHoldTrigger: tradeToActivate.minToHoldTrigger,
       trailingAfterTargetEnabled: tradeToActivate.trailingAfterTargetEnabled,
       trailingAfterTarget: tradeToActivate.trailingAfterTarget,
       trailingTrailActive: false,
