@@ -32,6 +32,8 @@ export type WaitingTrade = {
   buyOverride?: number;
   waitAfterSellEnabled: boolean;
   waitAfterSellCandles: number;
+  sellWhenLossCandlesEnabled: boolean;
+  sellWhenLossCandles: number;
   maxProfitLossEnabled: boolean;
   maxProfit: number;
   maxLoss: number;
@@ -71,6 +73,8 @@ export type ActiveTrade = {
   buyOverride?: number;
   waitAfterSellEnabled: boolean;
   waitAfterSellCandles: number;
+  sellWhenLossCandlesEnabled: boolean;
+  sellWhenLossCandles: number;
   lastSellCandleTime?: string;
   maxProfitLossEnabled: boolean;
   maxProfit: number;
@@ -278,6 +282,8 @@ export function TradeStoreProvider({
         })(),
         waitAfterSellEnabled: readFormBool(sym, "waitAfterSellEnabled", true),
         waitAfterSellCandles: readFormNumber(sym, "waitAfterSellCandles", 8),
+        sellWhenLossCandlesEnabled: readFormBool(sym, "sellWhenLossCandlesEnabled", false),
+        sellWhenLossCandles: readFormNumber(sym, "sellWhenLossCandles", 5),
         maxProfitLossEnabled: readFormBool(sym, "maxProfitLossEnabled", false),
         maxProfit: readFormNumber(sym, "maxProfit", 1100),
         maxLoss: readFormNumber(sym, "maxLoss", 900),
@@ -347,6 +353,8 @@ export function TradeStoreProvider({
       status: "ACTIVE",
       waitAfterSellEnabled: tradeToActivate.waitAfterSellEnabled,
       waitAfterSellCandles: tradeToActivate.waitAfterSellCandles,
+      sellWhenLossCandlesEnabled: tradeToActivate.sellWhenLossCandlesEnabled,
+      sellWhenLossCandles: tradeToActivate.sellWhenLossCandles,
       lastSellCandleTime: undefined,
       maxProfitLossEnabled: tradeToActivate.maxProfitLossEnabled,
       maxProfit: tradeToActivate.maxProfit,

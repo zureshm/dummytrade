@@ -266,6 +266,14 @@ type WaitingTrade = {
 
 
 
+  sellWhenLossCandlesEnabled: boolean;
+
+
+
+  sellWhenLossCandles: number;
+
+
+
   maxProfitLossEnabled: boolean;
 
 
@@ -415,6 +423,14 @@ type ActiveTrade = {
 
 
   waitAfterSellCandles: number;
+
+
+
+  sellWhenLossCandlesEnabled: boolean;
+
+
+
+  sellWhenLossCandles: number;
 
 
 
@@ -1262,6 +1278,14 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
 
 
+    sellWhenLossCandlesEnabled: trade.sellWhenLossCandlesEnabled,
+
+
+
+    sellWhenLossCandles: trade.sellWhenLossCandles,
+
+
+
     lastSellCandleTime: undefined,
 
 
@@ -1873,6 +1897,10 @@ function updateActiveTradeBuy(symbol: string, entryPrice: string, logLine: strin
 
 
       ...trade, entryPrice, inPosition: true,
+
+
+
+      entryTime: logLine.includes("at ") ? logLine.split("at ")[1] : undefined,
 
 
 
@@ -3047,6 +3075,20 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
     }
 
 
+
+    // Sell when in loss for X candles
+    if (trade.sellWhenLossCandlesEnabled && trade.sellWhenLossCandles > 0 && ltp < entry) {
+      const entryMin = toMinutes(trade.entryTime);
+      const currentMin = toMinutes(lastStrategyCandleTime);
+      if (entryMin >= 0 && currentMin >= 0) {
+        const candlesSinceEntry = currentMin - entryMin;
+        if (candlesSinceEntry >= trade.sellWhenLossCandles) {
+          triggeredPositions.add(positionKey);
+          completeCycleWithoutExit(trade.symbol, String(ltp), `SELL (in loss for ${candlesSinceEntry} candles) at ₹${ltp} at ${currentTime}`);
+          continue;
+        }
+      }
+    }
 
 
 

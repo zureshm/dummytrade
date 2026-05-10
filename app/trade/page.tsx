@@ -34,6 +34,8 @@ export default function TradePage() {
     setBuyOverrideSize(defaults.buyOverrideSize);
     setWaitAfterSellEnabled(defaults.waitAfterSellEnabled);
     setWaitAfterSellCandles(defaults.waitAfterSellCandles);
+    if ('sellWhenLossCandlesEnabled' in defaults) setSellWhenLossCandlesEnabled((defaults as any).sellWhenLossCandlesEnabled);
+    if ('sellWhenLossCandles' in defaults) setSellWhenLossCandles((defaults as any).sellWhenLossCandles);
     setMinToHoldEnabled(defaults.minToHoldEnabled);
     setMinToHold(defaults.minToHold);
     if ('minToHoldTrigger' in defaults) setMinToHoldTrigger((defaults as any).minToHoldTrigger);
@@ -67,6 +69,8 @@ export default function TradePage() {
   const [buyOverrideSize, setBuyOverrideSize] = useState(15);
   const [waitAfterSellEnabled, setWaitAfterSellEnabled] = useState(true);
   const [waitAfterSellCandles, setWaitAfterSellCandles] = useState(8);
+  const [sellWhenLossCandlesEnabled, setSellWhenLossCandlesEnabled] = useState(false);
+  const [sellWhenLossCandles, setSellWhenLossCandles] = useState(5);
   const [minToHoldEnabled, setMinToHoldEnabled] = useState(false);
   const [minToHold, setMinToHold] = useState(8);
   const [minToHoldTrigger, setMinToHoldTrigger] = useState(2);
@@ -138,6 +142,8 @@ export default function TradePage() {
       setBuyOverrideSize(data.buyOverrideSize || 15);
       setWaitAfterSellEnabled(Boolean(data.waitAfterSellEnabled ?? true));
       setWaitAfterSellCandles(data.waitAfterSellCandles || 8);
+      setSellWhenLossCandlesEnabled(Boolean(data.sellWhenLossCandlesEnabled ?? false));
+      setSellWhenLossCandles(data.sellWhenLossCandles || 5);
       setMinToHoldEnabled(Boolean(data.minToHoldEnabled ?? false));
       setMinToHold(data.minToHold || 8);
       setMinToHoldTrigger(data.minToHoldTrigger || 2);
@@ -166,6 +172,8 @@ export default function TradePage() {
       setBuyOverrideSize(15);
       setWaitAfterSellEnabled(true);
       setWaitAfterSellCandles(8);
+      setSellWhenLossCandlesEnabled(false);
+      setSellWhenLossCandles(5);
       setMinToHoldEnabled(false);
       setMinToHold(8);
       setMinToHoldTrigger(2);
@@ -206,6 +214,8 @@ export default function TradePage() {
       buyOverrideSize,
       waitAfterSellEnabled,
       waitAfterSellCandles,
+      sellWhenLossCandlesEnabled,
+      sellWhenLossCandles,
       trailingAfterTargetEnabled,
       trailingAfterTarget,
       rangeEnabled,
@@ -374,6 +384,27 @@ export default function TradePage() {
                   min="1"
                   max="99"
                   disabled={!waitAfterSellEnabled}
+                />
+                <span className="text-sm ml-2">candles</span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="sellWhenLossCandlesEnabled"
+                  checked={sellWhenLossCandlesEnabled}
+                  onChange={(e) => setSellWhenLossCandlesEnabled(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <label htmlFor="sellWhenLossCandlesEnabled" className="text-sm font-medium">SELL when in loss for</label>
+                <input
+                  type="number"
+                  value={sellWhenLossCandles}
+                  onChange={(e) => setSellWhenLossCandles(Number(e.target.value))}
+                  className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 ml-2"
+                  min="1"
+                  max="99"
+                  disabled={!sellWhenLossCandlesEnabled}
                 />
                 <span className="text-sm ml-2">candles</span>
               </div>
@@ -700,6 +731,8 @@ export default function TradePage() {
                         buyOverride: waitStrategyEnabled ? (buyOverrideSize || undefined) : undefined,
                         waitAfterSellEnabled,
                         waitAfterSellCandles,
+                        sellWhenLossCandlesEnabled,
+                        sellWhenLossCandles,
                         maxProfitLossEnabled,
                         maxProfit,
                         maxLoss,
