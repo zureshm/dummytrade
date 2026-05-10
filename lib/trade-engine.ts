@@ -600,6 +600,10 @@ const lastCandleLow: Record<string, number> = {};
 const lastBuyTimestamp: Record<string, number> = {};
 const BUY_GRACE_PERIOD_MS = 5000;
 
+// Grace period after minimum-target arming: ignore stale candle data for trigger check
+const trailingArmTimestamp: Record<string, number> = {};
+const TRAILING_ARM_GRACE_MS = 5000;
+
 
 
 // ─── Sound event queue (consumed by client via polling) ───
@@ -2880,15 +2884,17 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-        if (Math.max(candleClose, ltp) >= activationLevel) { trailingArmedPositions.add(positionKey); }
+        if (Math.max(candleClose, ltp) >= activationLevel) { trailingArmedPositions.add(positionKey); trailingArmTimestamp[positionKey] = Date.now(); }
 
 
 
       } else {
 
+        const armTs = trailingArmTimestamp[positionKey] || 0;
+        const inArmGrace = (Date.now() - armTs) < TRAILING_ARM_GRACE_MS;
+        const triggerPrice = inArmGrace ? ltp : Math.min(candleClose, ltp);
 
-
-        if (Math.min(candleClose, ltp) <= trailLevel) {
+        if (triggerPrice <= trailLevel) {
 
 
 
