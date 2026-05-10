@@ -2712,13 +2712,9 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-    // During buy grace period, ignore stale candle low/high (from pre-entry candle data)
-    // and use only real-time LTP to prevent false SL/Target triggers
-    const buyTs = lastBuyTimestamp[trade.symbol] || 0;
-    const inBuyGrace = (Date.now() - buyTs) < BUY_GRACE_PERIOD_MS;
-    const candleClose = inBuyGrace ? ltp : (lastCandleCloseMap[trade.symbol] ?? ltp);
-    const high = inBuyGrace ? ltp : (lastCandleHigh[trade.symbol] ?? ltp);
-    const low = inBuyGrace ? ltp : (lastCandleLow[trade.symbol] ?? ltp);
+    // Use only real-time LTP for all SL/Target/Trailing checks.
+    // Candle high/low from strategy signals are stale (previous completed candle)
+    // and would cause phantom exits on wicks that LTP polling already handles.
 
 
 
@@ -2736,9 +2732,9 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
       const entry = Number(trade.entryPrice);
 
-      const bestPnl = (trade.inPosition && Number.isFinite(entry)) ? (Math.max(high, ltp) - entry) * qty : 0;
+      const bestPnl = (trade.inPosition && Number.isFinite(entry)) ? (ltp - entry) * qty : 0;
 
-      const worstPnl = (trade.inPosition && Number.isFinite(entry)) ? (Math.min(low, ltp) - entry) * qty : 0;
+      const worstPnl = (trade.inPosition && Number.isFinite(entry)) ? (ltp - entry) * qty : 0;
 
 
 
@@ -2884,17 +2880,13 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-        if (Math.max(candleClose, ltp) >= activationLevel) { trailingArmedPositions.add(positionKey); trailingArmTimestamp[positionKey] = Date.now(); }
+        if (ltp >= activationLevel) { trailingArmedPositions.add(positionKey); }
 
 
 
       } else {
 
-        const armTs = trailingArmTimestamp[positionKey] || 0;
-        const inArmGrace = (Date.now() - armTs) < TRAILING_ARM_GRACE_MS;
-        const triggerPrice = inArmGrace ? ltp : Math.min(candleClose, ltp);
-
-        if (triggerPrice <= trailLevel) {
+        if (ltp <= trailLevel) {
 
 
 
@@ -2946,7 +2938,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-      const peakPrice = Math.max(candleClose, ltp);
+      const peakPrice = ltp;
 
 
 
@@ -2966,7 +2958,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-      const currentPrice = Math.min(candleClose, ltp);
+      const currentPrice = ltp;
 
 
 
@@ -3006,7 +2998,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-    if (trade.targetPointsEnabled && trade.targetPoints > 0 && (Math.max(high, ltp) - entry) >= trade.targetPoints) {
+    if (trade.targetPointsEnabled && trade.targetPoints > 0 && (ltp - entry) >= trade.targetPoints) {
 
 
 
@@ -3064,7 +3056,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-    if (trade.stopLossNumberEnabled && trade.stopLossNumber > 0 && (Math.min(low, ltp) - entry) <= -trade.stopLossNumber) {
+    if (trade.stopLossNumberEnabled && trade.stopLossNumber > 0 && (ltp - entry) <= -trade.stopLossNumber) {
 
 
 
