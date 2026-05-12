@@ -2198,7 +2198,7 @@ function handleStrategySignal(signal: any) {
 
 
 
-  const AUTO_SELL_CUTOFF_MINUTES = 15 * 60 + 20;
+  const AUTO_SELL_CUTOFF_MINUTES = 15 * 60 + 15;
 
 
 
@@ -2234,7 +2234,7 @@ function handleStrategySignal(signal: any) {
 
 
 
-    updateLastSellCandleTime(activeForSymbol.symbol, signal.lastCandleTime ?? "15:05");
+    updateLastSellCandleTime(activeForSymbol.symbol, signal.lastCandleTime ?? "15:15");
 
 
 
@@ -2880,7 +2880,11 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-        if (ltp >= activationLevel) { trailingArmedPositions.add(positionKey); }
+        if (ltp >= activationLevel) {
+          trailingArmedPositions.add(positionKey);
+          addLogToActive(trade.symbol, `Minimum target armed at ₹${ltp.toFixed(2)} (activation: ₹${activationLevel.toFixed(2)}) at ${currentTime}`);
+          persistState();
+        }
 
 
 
