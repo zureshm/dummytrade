@@ -50,14 +50,14 @@
   /* ============================================ */
   
   /* Page Backgrounds */
-  --theme-bg: #f1f5f9;
+  --theme-bg: #164c8e;
   --theme-page-bg: #f1f5f9;
   --theme-trade-page-bg: #fff;
   --theme-login-page-bg: #f1f5f9;
   
   /* Card Backgrounds */
-  --theme-card-white: #fff;
-  --theme-card-dark: #2f343b;
+  --theme-card-white: #fefefe;
+  --theme-card-dark: #104585;
   --theme-card-suggestion: #f3f6fb;
   --theme-card-log-line: #f8f9fa;
   --theme-card-shadow: rgba(0, 0, 0, 0.06);
@@ -81,24 +81,35 @@
   /* Buttons */
   --theme-btn-primary: #1677ff;
   --theme-btn-primary-hover: #0e5fcc;
+  --theme-btn-primary-text: #fff;
   --theme-btn-buy: #2b9b3a;
   --theme-btn-buy-hover: #1f7a2d;
-  --theme-btn-danger: #e23a3a;
+  --theme-btn-buy-text: #fff;
+  --theme-btn-danger: #febb08;
   --theme-btn-danger-hover: #c92e2e;
+  --theme-btn-danger-text: #fff;
   --theme-btn-disconnect: #e53935;
   --theme-btn-disconnect-hover: #d32f2f;
+  --theme-btn-disconnect-text: #fff;
+  --theme-btn-dark: #2f343b;
+  --theme-btn-dark-text: #fff;
+  --theme-btn-waiting-text: #fff;
+  --theme-btn-status-text: #fff;
   --theme-btn-yellow: yellow;
   --theme-btn-green: green;
   
   /* Tailwind Button Colors (for TSX) */
-  --theme-tailwind-yellow-500: #eab308;
+  --theme-tailwind-yellow-500: #9bb906;
   --theme-tailwind-yellow-600: #ca8a04;
-  --theme-tailwind-red-500: #ef4444;
+  --theme-tailwind-red-500: #b7390e;
   --theme-tailwind-red-600: #dc2626;
   --theme-tailwind-red-400: #f87171;
   --theme-tailwind-red-700: #b91c1c;
-  --theme-tailwind-blue-500: #3b82f6;
+  --theme-tailwind-blue-500: #0f4382;
   --theme-tailwind-blue-600: #2563eb;
+  --theme-tailwind-blue-text: #fff;
+  --theme-tailwind-yellow-text: #fff;
+  --theme-tailwind-red-text: #fff;
   
   /* Status Colors */
   --theme-status-waiting: #d12b2b;
@@ -136,7 +147,7 @@
   
   /* Note/Warning */
   --theme-note: #f18a00;
-  --theme-error: #e23a3a;
+  --theme-error: #febb08;
   
   /* Zinc Colors (for log-monitor page) */
   --theme-zinc-50: #fafafa;
@@ -158,5 +169,10 @@
 
 /* Card elements with data-slot="card" */
 [data-slot="card"] {
+  background: var(--theme-card-white);
+}
+
+/* Card header elements */
+[data-slot="card-header"] {
   background: var(--theme-card-white);
 }
