@@ -293,3 +293,8 @@
   --theme-amber-400: #fbbf24;
   --theme-amber-500: #f59e0b;
 }
+
+/* Card elements with data-slot="card" */
+[data-slot="card"] {
+  background: var(--theme-card-white);
+}
