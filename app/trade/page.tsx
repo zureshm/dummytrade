@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { STRATEGY_DEFAULTS } from "../../config/strategyDefaults";
 import { setActiveSymbol } from "@/lib/api";
+import styles from "./page.module.scss";
 
 export default function TradePage() {
   const router = useRouter();
@@ -235,7 +236,7 @@ export default function TradePage() {
   };
 
   return (
-    <div className="min-h-screen p-4 w-full max-w-[420px] mx-auto" style={{ backgroundColor: "var(--theme-trade-page-bg)" }}>
+    <div className={`min-h-screen p-4 w-full max-w-[420px] mx-auto ${styles.tradePage}`} style={{ backgroundColor: "var(--theme-trade-page-bg)" }}>
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-lg font-bold">Trade Configuration</CardTitle>
