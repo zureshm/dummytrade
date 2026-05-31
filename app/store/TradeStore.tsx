@@ -37,6 +37,8 @@ export type WaitingTrade = {
   maxProfitLossEnabled: boolean;
   maxProfit: number;
   maxLoss: number;
+  reEntryAfterTargetEnabled: boolean;
+  reEntryCandles: number;
 };
 
 // active trade shown in top running-trade card after strategy triggers it
@@ -79,6 +81,11 @@ export type ActiveTrade = {
   maxProfitLossEnabled: boolean;
   maxProfit: number;
   maxLoss: number;
+  reEntryAfterTargetEnabled: boolean;
+  reEntryCandles: number;
+  reEntryExitPrice?: number;
+  reEntrySellTime?: string;
+  reEntryReason?: string;
 };
 
 export type TradeHistoryItem = {
@@ -134,7 +141,7 @@ type TradeStoreValue = {
   setSelection: (s: TradeSelection) => void;
 
   waitingTrades: WaitingTrade[];
-  addWaitingTradeFromSelection: () => void;
+  addWaitingTradeFromSelection: (reEntryAfterTargetEnabled?: boolean, reEntryCandles?: number) => void;
   removeWaitingTrade: (symbol: string) => void;
 
   // active trades shown in the running trade card
@@ -239,7 +246,7 @@ export function TradeStoreProvider({
     lastStrategyCandleTimeRef.current = time;
   }, []);
 
-  const addWaitingTradeFromSelection = () => {
+  const addWaitingTradeFromSelection = (reEntryAfterTargetEnabled?: boolean, reEntryCandles?: number) => {
     if (!selection) return;
     const alreadyExists = waitingTrades.some((trade) => trade.symbol === selection.symbol);
     if (alreadyExists) return;
@@ -287,6 +294,8 @@ export function TradeStoreProvider({
         maxProfitLossEnabled: readFormBool(sym, "maxProfitLossEnabled", false),
         maxProfit: readFormNumber(sym, "maxProfit", 1100),
         maxLoss: readFormNumber(sym, "maxLoss", 900),
+        reEntryAfterTargetEnabled: reEntryAfterTargetEnabled ?? false,
+        reEntryCandles: reEntryCandles ?? 5,
       },
       ...waitingTrades,
     ];
@@ -359,6 +368,8 @@ export function TradeStoreProvider({
       maxProfitLossEnabled: tradeToActivate.maxProfitLossEnabled,
       maxProfit: tradeToActivate.maxProfit,
       maxLoss: tradeToActivate.maxLoss,
+      reEntryAfterTargetEnabled: tradeToActivate.reEntryAfterTargetEnabled,
+      reEntryCandles: tradeToActivate.reEntryCandles,
     };
 
     setActiveTrades((prev) => [...prev, newActiveTrade]);

@@ -51,6 +51,8 @@ export default function TradePage() {
     if ('maxProfitLossEnabled' in defaults) setMaxProfitLossEnabled((defaults as any).maxProfitLossEnabled);
     if ('maxProfit' in defaults) setMaxProfit((defaults as any).maxProfit);
     if ('maxLoss' in defaults) setMaxLoss((defaults as any).maxLoss);
+    if ('reEntryAfterTargetEnabled' in defaults) setReEntryAfterTargetEnabled((defaults as any).reEntryAfterTargetEnabled);
+    if ('reEntryCandles' in defaults) setReEntryCandles((defaults as any).reEntryCandles);
   };
 
   // Handle strategy change
@@ -79,6 +81,9 @@ export default function TradePage() {
   const [trailingAfterTargetEnabled, setTrailingAfterTargetEnabled] = useState(false);
   const [trailingAfterTarget, setTrailingAfterTarget] = useState(15);
   const [isTrailingAfterInfoOpen, setIsTrailingAfterInfoOpen] = useState(false);
+  const [reEntryAfterTargetEnabled, setReEntryAfterTargetEnabled] = useState(false);
+  const [reEntryCandles, setReEntryCandles] = useState(5);
+  const [isReEntryInfoOpen, setIsReEntryInfoOpen] = useState(false);
   const [rangeEnabled, setRangeEnabled] = useState(true);
   const [timeFrom, setTimeFrom] = useState('10:00');
   const [timeFromAmpm, setTimeFromAmpm] = useState('am');
@@ -159,6 +164,8 @@ export default function TradePage() {
       setMaxProfitLossEnabled(Boolean(data.maxProfitLossEnabled ?? false));
       setMaxProfit(data.maxProfit || 1100);
       setMaxLoss(data.maxLoss || 900);
+      setReEntryAfterTargetEnabled(Boolean(data.reEntryAfterTargetEnabled ?? false));
+      setReEntryCandles(data.reEntryCandles || 5);
     } else {
       // Reset to defaults
       setStrategy('nifty');
@@ -189,6 +196,8 @@ export default function TradePage() {
       setMaxProfitLossEnabled(false);
       setMaxProfit(1100);
       setMaxLoss(900);
+      setReEntryAfterTargetEnabled(false);
+      setReEntryCandles(5);
     }
   }, [selection?.symbol]);
 
@@ -231,6 +240,8 @@ export default function TradePage() {
       maxProfitLossEnabled,
       maxProfit,
       maxLoss,
+      reEntryAfterTargetEnabled,
+      reEntryCandles,
     };
     localStorage.setItem('tradeForm_' + selection.symbol, JSON.stringify(formData));
   };
@@ -561,6 +572,59 @@ export default function TradePage() {
                   />
                 </div>
               </div>
+
+              <div className="rounded-md border border-gray-200 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="reEntryAfterTargetEnabled"
+                      checked={reEntryAfterTargetEnabled}
+                      onChange={(e) => setReEntryAfterTargetEnabled(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="reEntryAfterTargetEnabled" className="text-sm font-medium">ReEntry After Target</label>
+                  </div>
+
+                  <div className="relative">
+                    <button
+                      type="button"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:text-gray-700"
+                      onClick={() => setIsReEntryInfoOpen((prev) => !prev)}
+                      aria-label="ReEntry after target info"
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                    {isReEntryInfoOpen && (
+                      <div
+                        className="absolute right-0 mt-2 w-64 rounded-md p-2 text-white shadow-lg"
+                        style={{
+                          zIndex: 9,
+                          background: "rgba(0, 0, 0, 0.8)",
+                          fontSize: "11px",
+                          lineHeight: "18px",
+                        }}
+                      >
+                        After exiting with a profit (target, trailing SL, or minimum target), if the price trends back up and exceeds the exit price within the specified candles, a new buy is triggered. Does not apply for stop-loss or loss exits.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 pl-6">
+                  <label className={`text-sm ${reEntryAfterTargetEnabled ? "" : "text-gray-400"}`}>Uptrend within</label>
+                  <input
+                    type="number"
+                    value={reEntryCandles}
+                    onChange={(e) => setReEntryCandles(Number(e.target.value) || 1)}
+                    className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                    min="1"
+                    max="99"
+                    disabled={!reEntryAfterTargetEnabled}
+                  />
+                  <span className="text-sm">Candles</span>
+                </div>
+              </div>
             </div>
 
             <p className="text-xs text-gray-500">If no target/profit strategy is checked, target booking will not be applied for this trade.</p>
@@ -701,7 +765,7 @@ export default function TradePage() {
                       setActiveSymbol(selection.symbol).catch(() => {});
 
                       saveForm();
-                      addWaitingTradeFromSelection();
+                      addWaitingTradeFromSelection(reEntryAfterTargetEnabled, reEntryCandles);
 
                       // POST to server-side trade engine so it picks up the trade
                     fetch("/api/trades", {
@@ -737,6 +801,8 @@ export default function TradePage() {
                         maxProfitLossEnabled,
                         maxProfit,
                         maxLoss,
+                        reEntryAfterTargetEnabled,
+                        reEntryCandles,
                       }),
                     }).catch(() => {});
 
