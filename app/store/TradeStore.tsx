@@ -141,7 +141,7 @@ type TradeStoreValue = {
   setSelection: (s: TradeSelection) => void;
 
   waitingTrades: WaitingTrade[];
-  addWaitingTradeFromSelection: (reEntryAfterTargetEnabled?: boolean, reEntryCandles?: number) => void;
+  addWaitingTradeFromSelection: () => void;
   removeWaitingTrade: (symbol: string) => void;
 
   // active trades shown in the running trade card
@@ -246,7 +246,7 @@ export function TradeStoreProvider({
     lastStrategyCandleTimeRef.current = time;
   }, []);
 
-  const addWaitingTradeFromSelection = (reEntryAfterTargetEnabled?: boolean, reEntryCandles?: number) => {
+  const addWaitingTradeFromSelection = () => {
     if (!selection) return;
     const alreadyExists = waitingTrades.some((trade) => trade.symbol === selection.symbol);
     if (alreadyExists) return;
@@ -294,8 +294,8 @@ export function TradeStoreProvider({
         maxProfitLossEnabled: readFormBool(sym, "maxProfitLossEnabled", false),
         maxProfit: readFormNumber(sym, "maxProfit", 1100),
         maxLoss: readFormNumber(sym, "maxLoss", 900),
-        reEntryAfterTargetEnabled: reEntryAfterTargetEnabled ?? false,
-        reEntryCandles: reEntryCandles ?? 5,
+        reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
+        reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
       },
       ...waitingTrades,
     ];

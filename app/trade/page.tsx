@@ -622,7 +622,7 @@ export default function TradePage() {
                     max="99"
                     disabled={!reEntryAfterTargetEnabled}
                   />
-                  <span className="text-sm">Candles</span>
+                  <span className={`text-sm ${reEntryAfterTargetEnabled ? "" : "text-gray-400"}`}>Candles</span>
                 </div>
               </div>
             </div>
@@ -765,7 +765,7 @@ export default function TradePage() {
                       setActiveSymbol(selection.symbol).catch(() => {});
 
                       saveForm();
-                      addWaitingTradeFromSelection(reEntryAfterTargetEnabled, reEntryCandles);
+                      addWaitingTradeFromSelection();
 
                       // POST to server-side trade engine so it picks up the trade
                     fetch("/api/trades", {

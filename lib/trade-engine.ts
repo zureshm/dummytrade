@@ -2848,14 +2848,14 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
         const currentMin = toMinutes(lastStrategyCandleTime);
         if (sellMin >= 0 && currentMin >= 0) {
           const candlesSinceSell = currentMin - sellMin;
-          if (candlesSinceSell <= trade.reEntryCandles) {
-            // Price has trended back up above exit price → re-enter
+          if (candlesSinceSell >= 1 && candlesSinceSell <= trade.reEntryCandles) {
+            // Price has trended back up above exit price → re-enter (skip same candle)
             if (ltp > trade.reEntryExitPrice) {
               const reEntryLog = `RE-ENTRY triggered at ₹${ltp.toFixed(2)} (price exceeded exit ₹${trade.reEntryExitPrice.toFixed(2)} within ${candlesSinceSell}/${trade.reEntryCandles} candles) at ${currentTime}`;
               updateActiveTradeBuy(trade.symbol, String(ltp), reEntryLog);
               continue;
             }
-          } else {
+          } else if (candlesSinceSell > trade.reEntryCandles) {
             // Window expired — clear re-entry state
             addLogToActive(trade.symbol, `ReEntry window expired (${trade.reEntryCandles} candles passed since exit)`);
             clearReEntryState(trade.symbol);
