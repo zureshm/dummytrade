@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
-import styles from "./page.module.scss";
+import { X, Settings } from "lucide-react";
 
 const STRATEGY_URL = process.env.NEXT_PUBLIC_STRATEGY_URL || "http://localhost:4000";
 
@@ -86,58 +85,68 @@ export default function SettingsPopup({ open, onClose }: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "var(--theme-popup-backdrop)" }}
+      onClick={onClose}
+    >
       <div
-        className="relative w-[340px] rounded-xl p-5"
+        className="relative w-[380px] rounded-2xl p-6"
         style={{
-          background: "var(--theme-card-bg, #1a1a2e)",
-          color: "var(--theme-card-white, #fff)",
-          border: "1px solid rgba(255,255,255,0.12)",
+          background: "var(--theme-popup-bg)",
+          color: "var(--theme-popup-text)",
+          border: "3px solid var(--theme-popup-border)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">Settings</h2>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Settings size={20} style={{ color: "var(--theme-popup-border)" }} />
+            <h2 className="text-lg font-bold" style={{ color: "var(--theme-popup-text)" }}>Settings</h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full hover:bg-white/10 transition"
+            className="p-1.5 rounded-full transition"
+            style={{ background: "var(--theme-popup-border)", color: "#fff" }}
             aria-label="Close"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         {loading ? (
-          <div className="text-sm text-gray-400 py-4 text-center">Loading...</div>
+          <div className="text-sm py-4 text-center" style={{ color: "var(--theme-popup-label)" }}>Loading...</div>
         ) : (
           <>
             {/* Current strategy */}
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 mb-1">Current Running Strategy</div>
-              <div className="text-sm font-semibold px-3 py-2 rounded-lg" style={{ background: "rgba(255,255,255,0.08)" }}>
+            <div className="mb-5">
+              <div className="text-xs font-medium mb-1" style={{ color: "var(--theme-popup-label)" }}>Current Running Strategy</div>
+              <div className="text-base font-bold" style={{ color: "var(--theme-popup-border)" }}>
                 {getDisplayName(activeStrategy)}
               </div>
             </div>
 
             {/* Strategy selector */}
-            <div className="mb-4">
-              <label className="text-xs text-gray-400 mb-1 block">Switch Strategy</label>
+            <div className="mb-5">
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--theme-popup-label)" }}>Switch Strategy</label>
               <select
                 value={selectedStrategy}
                 onChange={(e) => {
                   setSelectedStrategy(e.target.value);
                   setMessage(null);
                 }}
-                className="w-full h-9 px-3 rounded-lg text-sm"
+                className="w-full h-10 px-4 rounded-lg text-sm"
                 style={{
-                  background: "rgba(255,255,255,0.08)",
-                  color: "var(--theme-card-white, #fff)",
-                  border: "1px solid rgba(255,255,255,0.15)",
+                  background: "var(--theme-popup-field-bg)",
+                  color: "var(--theme-popup-text)",
+                  border: "1px solid var(--theme-popup-field-border)",
                   outline: "none",
                 }}
               >
                 {availableStrategies.map((s) => (
-                  <option key={s} value={s} style={{ background: "#1a1a2e", color: "#fff" }}>
+                  <option key={s} value={s} style={{ background: "var(--theme-popup-bg)", color: "var(--theme-popup-text)" }}>
                     {getDisplayName(s)}
                   </option>
                 ))}
@@ -148,12 +157,18 @@ export default function SettingsPopup({ open, onClose }: Props) {
             <button
               onClick={handleSave}
               disabled={saving || selectedStrategy === activeStrategy}
-              className="w-full h-9 rounded-lg text-sm font-semibold transition"
+              className="w-full h-10 rounded-lg text-sm font-semibold transition"
               style={{
-                background: selectedStrategy === activeStrategy ? "rgba(255,255,255,0.06)" : "#22c55e",
-                color: selectedStrategy === activeStrategy ? "rgba(255,255,255,0.35)" : "#fff",
+                background: selectedStrategy === activeStrategy
+                  ? "var(--theme-popup-field-bg)"
+                  : "var(--theme-popup-border)",
+                color: selectedStrategy === activeStrategy
+                  ? "var(--theme-popup-label)"
+                  : "#fff",
                 cursor: selectedStrategy === activeStrategy ? "not-allowed" : "pointer",
-                border: "none",
+                border: selectedStrategy === activeStrategy
+                  ? "1px solid var(--theme-popup-field-border)"
+                  : "none",
               }}
             >
               {saving ? "Saving..." : selectedStrategy === activeStrategy ? "No Change" : "Save"}
@@ -162,10 +177,10 @@ export default function SettingsPopup({ open, onClose }: Props) {
             {/* Status message */}
             {message && (
               <div
-                className="mt-3 text-xs px-3 py-2 rounded-lg text-center"
+                className="mt-3 text-xs px-3 py-2 rounded-lg text-center font-medium"
                 style={{
-                  background: message.type === "success" ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
-                  color: message.type === "success" ? "#22c55e" : "#ef4444",
+                  background: message.type === "success" ? "rgba(10,155,63,0.1)" : "rgba(209,43,43,0.1)",
+                  color: message.type === "success" ? "var(--theme-status-success)" : "var(--theme-status-loss)",
                 }}
               >
                 {message.text}
