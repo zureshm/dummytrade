@@ -104,7 +104,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
           background: "var(--theme-popup-bg)",
           color: "var(--theme-popup-text)",
           border: "3px solid var(--theme-popup-border)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",  maxWidth:"90%" 
         }}
         onClick={(e) => e.stopPropagation()}
       >
