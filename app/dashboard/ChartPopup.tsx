@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { X, BarChart2 } from "lucide-react";
 import { createChart, CandlestickSeries, IChartApi, UTCTimestamp, SeriesMarker, Time, createSeriesMarkers } from "lightweight-charts";
+import { useTradeStore } from "../store/TradeStore";
 
 const STRATEGY_URL = process.env.NEXT_PUBLIC_STRATEGY_API_URL || "http://localhost:4000";
 
@@ -98,11 +99,18 @@ type Props = {
 };
 
 export default function ChartPopup({ open, onClose }: Props) {
+  const { activeTrades, waitingTrades } = useTradeStore();
   const [symbolCandles, setSymbolCandles] = useState<SymbolCandles>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const chartInstances = useRef<Record<string, IChartApi>>({});
+
+  // Only show charts for symbols in active/waiting trades
+  const activeSymbols = new Set([
+    ...activeTrades.map((t) => t.symbol),
+    ...waitingTrades.map((t) => t.symbol),
+  ]);
 
   // Clear data when popup closes
   useEffect(() => {
@@ -140,7 +148,9 @@ export default function ChartPopup({ open, onClose }: Props) {
 
   // Create/update charts when data changes
   useEffect(() => {
-    const symbols = Object.keys(symbolCandles).slice(0, 4);
+    const symbols = Object.keys(symbolCandles)
+      .filter((s) => activeSymbols.has(s))
+      .slice(0, 4);
 
     // Dispose old charts
     Object.keys(chartInstances.current).forEach((key) => {
@@ -231,11 +241,13 @@ export default function ChartPopup({ open, onClose }: Props) {
       Object.values(chartInstances.current).forEach((chart) => chart.remove());
       chartInstances.current = {};
     };
-  }, [symbolCandles]);
+  }, [symbolCandles, activeSymbols.size]);
 
   if (!open) return null;
 
-  const symbols = Object.keys(symbolCandles).slice(0, 4);
+  const symbols = Object.keys(symbolCandles)
+    .filter((s) => activeSymbols.has(s))
+    .slice(0, 4);
 
   return (
     <div
