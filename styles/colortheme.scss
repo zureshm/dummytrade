@@ -4,7 +4,8 @@
 /* To change the color scheme, modify these values. */
 /* ============================================ */
 
-:root {
+:root,
+[data-theme="default"] {
   /* ============================================ */
   /* BASE COLORS (from globals.css - Light Theme) */
   /* ============================================ */
@@ -27,6 +28,7 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
   
   /* Chart Colors */
   --chart-1: oklch(0.809 0.105 251.813);
@@ -50,9 +52,9 @@
   /* ============================================ */
   
   /* Page Backgrounds */
-  --theme-bg: #f1f5f9;
+  --theme-bg: #323335;
   --theme-page-bg: #f1f5f9;
-  --theme-trade-page-bg: #fff;
+  --theme-trade-page-bg: #323335;
   --theme-login-page-bg: #f1f5f9;
   
   /* Card Backgrounds */
@@ -63,6 +65,7 @@
   --theme-card-shadow: rgba(0, 0, 0, 0.06);
   
   /* Borders */
+  --theme-border: #222;
   --theme-border-dark: #222;
   --theme-border-light: rgba(0, 0, 0, 0.12);
   --theme-border-subtle: rgba(0, 0, 0, 0.06);
@@ -146,6 +149,10 @@
   --theme-log-pl-profit-alt: #0a8a43;
   --theme-log-pl-loss-alt: #d12b2b;
   
+  /* Shadows */
+  --theme-shadow-log: rgba(0, 0, 0, 0.15);
+  --theme-shadow-log-inset: rgba(255, 255, 255, 0.1);
+  
   /* Time Badge */
   --theme-time-badge-bg: #000000;
   --theme-time-badge-text: #ffffff;
@@ -170,6 +177,15 @@
   /* Amber Colors (for log-monitor page) */
   --theme-amber-400: #fbbf24;
   --theme-amber-500: #f59e0b;
+
+  /* Settings Popup */
+  --theme-popup-bg: var(--theme-card-white);
+  --theme-popup-border: var(--theme-bg);
+  --theme-popup-text: var(--theme-text-primary);
+  --theme-popup-label: var(--theme-text-secondary);
+  --theme-popup-field-bg: rgba(0, 0, 0, 0.04);
+  --theme-popup-field-border: rgba(0, 0, 0, 0.12);
+  --theme-popup-backdrop: rgba(255, 255, 255, 0.5);
 }
 
 /* ============================================ */
@@ -226,6 +242,7 @@
   --theme-card-log-line: #1f2937;
   --theme-card-shadow: rgba(0, 0, 0, 0.3);
   
+  --theme-border: #444;
   --theme-border-dark: #444;
   --theme-border-light: rgba(255, 255, 255, 0.12);
   --theme-border-subtle: rgba(255, 255, 255, 0.06);
@@ -303,6 +320,9 @@
   --theme-log-pl-profit-alt: #4ade80;
   --theme-log-pl-loss-alt: #f87171;
   
+  --theme-shadow-log: rgba(0, 0, 0, 0.3);
+  --theme-shadow-log-inset: rgba(255, 255, 255, 0.05);
+  
   --theme-time-badge-bg: #1f2937;
   --theme-time-badge-text: #e5e5e5;
   
@@ -328,5 +348,10 @@
 
 /* Card elements with data-slot="card" */
 [data-slot="card"] {
+  background: var(--theme-card-white);
+}
+
+/* Card header elements */
+[data-slot="card-header"] {
   background: var(--theme-card-white);
 }
