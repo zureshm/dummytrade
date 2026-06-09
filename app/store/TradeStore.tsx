@@ -139,6 +139,8 @@ const buildTradeConfigSnapshot = (
 type TradeStoreValue = {
   selection: TradeSelection;
   setSelection: (s: TradeSelection) => void;
+  forceBuyEnabled: boolean;
+  setForceBuyEnabled: (v: boolean) => void;
 
   waitingTrades: WaitingTrade[];
   addWaitingTradeFromSelection: () => void;
@@ -223,6 +225,7 @@ export function TradeStoreProvider({
   children: React.ReactNode;
 }) {
   const [selection, setSelection] = useState<TradeSelection>(null);
+  const [forceBuyEnabled, setForceBuyEnabled] = useState(false);
 
   // Server JSON file is the single source of truth — start empty, syncFromServer fills it
   const [waitingTrades, setWaitingTrades] = useState<WaitingTrade[]>([]);
@@ -736,6 +739,8 @@ export function TradeStoreProvider({
     () => ({
       selection,
       setSelection,
+      forceBuyEnabled,
+      setForceBuyEnabled,
       waitingTrades,
       addWaitingTradeFromSelection,
       removeWaitingTrade,
@@ -760,7 +765,7 @@ export function TradeStoreProvider({
       setLastStrategyCandleTime,
       syncFromServer,
     }),
-    [selection, waitingTrades, activeTrades, tradeHistory, syncFromServer]
+    [selection, forceBuyEnabled, waitingTrades, activeTrades, tradeHistory, syncFromServer]
   );
 
   return (
