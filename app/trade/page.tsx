@@ -436,7 +436,7 @@ export default function TradePage() {
                       onChange={(e) => setMinToHoldEnabled(e.target.checked)}
                       className="h-4 w-4"
                     />
-                    <label htmlFor="minToHoldEnabled" className="text-sm font-medium">Minimum target</label>
+                    <label htmlFor="minToHoldEnabled" className="text-sm font-medium" style={{color:'green'}}>Minimum target</label>
                   </div>
 
                   <div className="relative">
@@ -554,7 +554,7 @@ export default function TradePage() {
                       onChange={(e) => setReEntryAfterTargetEnabled(e.target.checked)}
                       className="h-4 w-4"
                     />
-                    <label htmlFor="reEntryAfterTargetEnabled" className="text-sm font-medium">Re-entry Condition</label>
+                    <label htmlFor="reEntryAfterTargetEnabled" className="text-sm font-medium" style={{color:'red'}}>Re-entry Condition</label>
                   </div>
 
                   <div className="relative">
