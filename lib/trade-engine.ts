@@ -264,6 +264,15 @@ type WaitingTrade = {
 
 
 
+  reEntryAfterTargetEnabled: boolean;
+
+
+
+  reEntryCandles: number;
+  reEntryPoints: number;
+
+
+
 };
 
 
@@ -425,6 +434,27 @@ type ActiveTrade = {
 
 
   maxLoss: number;
+
+
+
+  reEntryAfterTargetEnabled: boolean;
+
+
+
+  reEntryCandles: number;
+  reEntryPoints: number;
+
+
+
+  reEntryExitPrice?: number;
+
+
+
+  reEntrySellTime?: string;
+
+
+
+  reEntryReason?: string;
 
 
 
@@ -1148,7 +1178,11 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
 
 
-    logs: [...trade.logs, logLine],
+    logs: [
+      ...trade.logs,
+      logLine,
+      ...(trade.reEntryAfterTargetEnabled ? [`ReEntry enabled: will re-enter if price exceeds exit within ${trade.reEntryCandles} candles after profitable exit`] : []),
+    ],
 
 
 
@@ -1285,6 +1319,15 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
 
     maxLoss: trade.maxLoss,
+
+
+
+    reEntryAfterTargetEnabled: trade.reEntryAfterTargetEnabled,
+
+
+
+    reEntryCandles: trade.reEntryCandles,
+    reEntryPoints: trade.reEntryPoints,
 
 
 
@@ -1827,6 +1870,27 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
 
 
+    // Determine if this was a profitable exit (target/trailing/min target)
+    const isProfitableExit = cyclePnl >= 0 && !logLine.includes("STOPLOSS") && !logLine.includes("in loss");
+    const reEntryInfo = (trade.reEntryAfterTargetEnabled && isProfitableExit) ? {
+      reEntryExitPrice: Number(exitPrice),
+      reEntrySellTime: lastStrategyCandleTime || trade.lastSellCandleTime,
+      reEntryReason: logLine,
+    } : {
+      reEntryExitPrice: undefined,
+      reEntrySellTime: undefined,
+      reEntryReason: undefined,
+    };
+
+    let reEntryMsg = `Cycle ${newCompletedCycles}/${trade.numberOfTrades} completed (SL/Target hit - waiting for next signal)`;
+    if (trade.reEntryAfterTargetEnabled && isProfitableExit) {
+      reEntryMsg = `ReEntry armed: watching for price > ₹${exitPrice} within ${trade.reEntryCandles} candles`;
+    } else if (trade.reEntryAfterTargetEnabled && !isProfitableExit) {
+      reEntryMsg += ` [ReEntry skipped: not a profitable exit]`;
+    } else if (!trade.reEntryAfterTargetEnabled) {
+      reEntryMsg += ` [ReEntry disabled]`;
+    }
+
     return {
 
 
@@ -1835,7 +1899,7 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
 
 
-      logs: [...trade.logs, sellLog, logLine, `Trade P/L: ${cyclePnl.toFixed(2)}`, `Cycle ${newCompletedCycles}/${trade.numberOfTrades} completed (SL/Target hit - waiting for next signal)`],
+      logs: [...trade.logs, sellLog, logLine, `Trade P/L: ${cyclePnl.toFixed(2)}`, reEntryMsg],
 
 
 
@@ -1845,7 +1909,7 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
       lastSellCandleTime: lastStrategyCandleTime || trade.lastSellCandleTime,
 
-
+      ...reEntryInfo,
 
     };
 
@@ -1897,7 +1961,7 @@ function updateActiveTradeBuy(symbol: string, entryPrice: string, logLine: strin
 
       trailingTrailActive: false, trailingHighWatermark: undefined,
 
-
+      reEntryExitPrice: undefined, reEntrySellTime: undefined, reEntryReason: undefined,
 
     };
 
@@ -1979,6 +2043,16 @@ function addLogToActive(symbol: string, log: string) {
 
 
 
+
+
+
+function clearReEntryState(symbol: string) {
+  activeTrades = activeTrades.map((t) =>
+    t.symbol === symbol && t.status === "ACTIVE"
+      ? { ...t, reEntryExitPrice: undefined, reEntrySellTime: undefined, reEntryReason: undefined }
+      : t
+  );
+}
 
 
 
@@ -2172,11 +2246,11 @@ function handleStrategySignal(signal: any) {
 
 
 
-  // Auto-sell cutoff at 3:05 PM
+  // Auto-sell cutoff at 3:25 PM
 
 
 
-  const AUTO_SELL_CUTOFF_MINUTES = 15 * 60 + 15;
+  const AUTO_SELL_CUTOFF_MINUTES = 15 * 60 + 25;
 
 
 
@@ -2766,6 +2840,32 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
+      // ReEntry After Target logic
+      if (
+        trade.reEntryAfterTargetEnabled &&
+        trade.reEntryExitPrice &&
+        trade.reEntrySellTime &&
+        Number.isFinite(ltp)
+      ) {
+        const sellMin = toMinutes(trade.reEntrySellTime);
+        const currentMin = toMinutes(lastStrategyCandleTime);
+        if (sellMin >= 0 && currentMin >= 0) {
+          const candlesSinceSell = currentMin - sellMin;
+          const reEntryThreshold = trade.reEntryExitPrice + (trade.reEntryPoints || 5);
+          if (candlesSinceSell <= trade.reEntryCandles) {
+            if (ltp > reEntryThreshold) {
+              const reEntryLog = `RE-ENTRY triggered at ₹${ltp.toFixed(2)} (price exceeded exit+${trade.reEntryPoints || 5} ₹${reEntryThreshold.toFixed(2)} within ${candlesSinceSell}/${trade.reEntryCandles} candles) at ${currentTime}`;
+              updateActiveTradeBuy(trade.symbol, String(ltp), reEntryLog);
+              continue;
+            }
+          } else {
+            // Window expired — clear re-entry state
+            addLogToActive(trade.symbol, `ReEntry window expired (${trade.reEntryCandles} candles passed since exit)`);
+            clearReEntryState(trade.symbol);
+          }
+        }
+      }
+
       continue;
 
 
@@ -3164,11 +3264,11 @@ async function tick() {
 
 
 
-    // 2. Fetch LTP prices from port 2000 for active trades in position
+    // 2. Fetch LTP prices from port 2000 for active trades in position (+ re-entry monitoring)
 
 
 
-    const inPositionTrades = activeTrades.filter((t) => t.inPosition && t.status === "ACTIVE");
+    const inPositionTrades = activeTrades.filter((t) => t.status === "ACTIVE" && (t.inPosition || (t.reEntryAfterTargetEnabled && t.reEntryExitPrice)));
 
 
 

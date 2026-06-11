@@ -37,6 +37,9 @@ export type WaitingTrade = {
   maxProfitLossEnabled: boolean;
   maxProfit: number;
   maxLoss: number;
+  reEntryAfterTargetEnabled: boolean;
+  reEntryCandles: number;
+  reEntryPoints: number;
 };
 
 // active trade shown in top running-trade card after strategy triggers it
@@ -79,6 +82,12 @@ export type ActiveTrade = {
   maxProfitLossEnabled: boolean;
   maxProfit: number;
   maxLoss: number;
+  reEntryAfterTargetEnabled: boolean;
+  reEntryCandles: number;
+  reEntryPoints: number;
+  reEntryExitPrice?: number;
+  reEntrySellTime?: string;
+  reEntryReason?: string;
 };
 
 export type TradeHistoryItem = {
@@ -132,6 +141,8 @@ const buildTradeConfigSnapshot = (
 type TradeStoreValue = {
   selection: TradeSelection;
   setSelection: (s: TradeSelection) => void;
+  forceBuyEnabled: boolean;
+  setForceBuyEnabled: (v: boolean) => void;
 
   waitingTrades: WaitingTrade[];
   addWaitingTradeFromSelection: () => void;
@@ -216,6 +227,7 @@ export function TradeStoreProvider({
   children: React.ReactNode;
 }) {
   const [selection, setSelection] = useState<TradeSelection>(null);
+  const [forceBuyEnabled, setForceBuyEnabled] = useState(false);
 
   // Server JSON file is the single source of truth — start empty, syncFromServer fills it
   const [waitingTrades, setWaitingTrades] = useState<WaitingTrade[]>([]);
@@ -287,6 +299,9 @@ export function TradeStoreProvider({
         maxProfitLossEnabled: readFormBool(sym, "maxProfitLossEnabled", false),
         maxProfit: readFormNumber(sym, "maxProfit", 1100),
         maxLoss: readFormNumber(sym, "maxLoss", 900),
+        reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
+        reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
+        reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
       },
       ...waitingTrades,
     ];
@@ -359,6 +374,9 @@ export function TradeStoreProvider({
       maxProfitLossEnabled: tradeToActivate.maxProfitLossEnabled,
       maxProfit: tradeToActivate.maxProfit,
       maxLoss: tradeToActivate.maxLoss,
+      reEntryAfterTargetEnabled: tradeToActivate.reEntryAfterTargetEnabled,
+      reEntryCandles: tradeToActivate.reEntryCandles,
+      reEntryPoints: tradeToActivate.reEntryPoints,
     };
 
     setActiveTrades((prev) => [...prev, newActiveTrade]);
@@ -725,6 +743,8 @@ export function TradeStoreProvider({
     () => ({
       selection,
       setSelection,
+      forceBuyEnabled,
+      setForceBuyEnabled,
       waitingTrades,
       addWaitingTradeFromSelection,
       removeWaitingTrade,
@@ -749,7 +769,7 @@ export function TradeStoreProvider({
       setLastStrategyCandleTime,
       syncFromServer,
     }),
-    [selection, waitingTrades, activeTrades, tradeHistory, syncFromServer]
+    [selection, forceBuyEnabled, waitingTrades, activeTrades, tradeHistory, syncFromServer]
   );
 
   return (
