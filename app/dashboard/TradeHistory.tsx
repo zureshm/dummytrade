@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { History, Trash2, XCircle, Loader2 } from "lucide-react";
 import styles from "./TradeHistory.module.scss";
+import { BASE_PATH } from "@/lib/basePath";
 
 export default function TradeHistory() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function TradeHistory() {
               style={{ color: "var(--theme-tailwind-red-500)" }}
               onClick={() => {
                 if (window.confirm("Clear all trade history?")) {
-                  fetch("/api/trades/history/clear", { method: "POST" }).catch(() => {});
+                  fetch(`${BASE_PATH}/api/trades/history/clear`, { method: "POST" }).catch(() => {});
                   clearTradeHistory();
                 }
               }}
@@ -122,7 +123,7 @@ export default function TradeHistory() {
                       disabled={deletingIds.has(item.id)}
                       onClick={() => {
                         setDeletingIds((prev) => new Set(prev).add(item.id));
-                        fetch(`/api/trades/history/${encodeURIComponent(item.id)}/remove`, { method: "POST" })
+                        fetch(`${BASE_PATH}/api/trades/history/${encodeURIComponent(item.id)}/remove`, { method: "POST" })
                           .then(() => {
                             removeTradeHistoryEntry(item.id);
                           })

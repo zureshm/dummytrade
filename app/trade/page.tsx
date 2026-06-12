@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { STRATEGY_DEFAULTS } from "../../config/strategyDefaults";
 import { setActiveSymbol } from "@/lib/api";
 import styles from "./page.module.scss";
+import { BASE_PATH } from "@/lib/basePath";
 
 export default function TradePage() {
   const router = useRouter();
@@ -135,7 +136,7 @@ export default function TradePage() {
   useEffect(() => {
     if (!selection?.symbol) return;
 
-    const saved = localStorage.getItem('tradeForm_' + selection.symbol);
+    const saved = localStorage.getItem('dummy_tradeForm_' + selection.symbol);
     if (saved) {
       const data = JSON.parse(saved);
       setStrategy(data.strategy || 'nifty');
@@ -214,7 +215,7 @@ export default function TradePage() {
       reEntryCandles,
       reEntryPoints,
     };
-    localStorage.setItem('tradeForm_' + selection.symbol, JSON.stringify(formData));
+    localStorage.setItem('dummy_tradeForm_' + selection.symbol, JSON.stringify(formData));
   };
 
   return (
@@ -752,7 +753,7 @@ export default function TradePage() {
                       addWaitingTradeFromSelection();
 
                       // POST to server-side trade engine so it picks up the trade
-                    fetch("/api/trades", {
+                    fetch(`${BASE_PATH}/api/trades`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({

@@ -197,7 +197,7 @@ const TradeStoreContext = createContext<TradeStoreValue | null>(null);
 
 function readFormField(symbol: string, field: string, fallback: any) {
   try {
-    const saved = localStorage.getItem("tradeForm_" + symbol);
+    const saved = localStorage.getItem("dummy_tradeForm_" + symbol);
     if (!saved) return fallback;
     const data = JSON.parse(saved);
     return data[field] ?? fallback;
@@ -282,7 +282,7 @@ export function TradeStoreProvider({
         timeToAmpm: readFormString(sym, "timeToAmpm", "pm"),
         buyOverride: (() => {
           try {
-            const saved = localStorage.getItem("tradeForm_" + sym);
+            const saved = localStorage.getItem("dummy_tradeForm_" + sym);
             if (!saved) return undefined;
             const data = JSON.parse(saved);
             if (!data.waitStrategyEnabled) return undefined;
@@ -315,7 +315,7 @@ export function TradeStoreProvider({
       (trade) => trade.symbol !== symbol
     );
     setWaitingTrades(newWaitingTrades);
-    localStorage.removeItem("tradeForm_" + symbol);
+    localStorage.removeItem("dummy_tradeForm_" + symbol);
   };
 
   const addLogToWaitingTrade = (symbol: string, log: string) => {
@@ -553,7 +553,7 @@ export function TradeStoreProvider({
     if (selection?.symbol === symbol) {
       setSelection(null);
     }
-    localStorage.removeItem("tradeForm_" + symbol);
+    localStorage.removeItem("dummy_tradeForm_" + symbol);
   };
 
   const addLogToActiveTrade = (symbol: string, log: string) => {

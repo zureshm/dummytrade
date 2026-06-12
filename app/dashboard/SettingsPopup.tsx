@@ -48,7 +48,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
 
   // Load volume from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem("soundVolume");
+    const stored = localStorage.getItem("dummy_soundVolume");
     if (stored) setVolumeState(parseFloat(stored));
   }, []);
 
