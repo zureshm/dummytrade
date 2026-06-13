@@ -36,7 +36,7 @@ export const WatchlistProvider = ({ children }: { children: ReactNode }): ReactN
 
     if (typeof window !== 'undefined') {
 
-      const saved = localStorage.getItem('watchlist');
+      const saved = localStorage.getItem('dummy_watchlist');
 
       return saved ? JSON.parse(saved) : [];
 
@@ -62,7 +62,7 @@ export const WatchlistProvider = ({ children }: { children: ReactNode }): ReactN
 
     setWatchlist(newWatchlist);
 
-    localStorage.setItem('watchlist', JSON.stringify(newWatchlist));
+    localStorage.setItem('dummy_watchlist', JSON.stringify(newWatchlist));
 
   };
 
@@ -74,7 +74,7 @@ export const WatchlistProvider = ({ children }: { children: ReactNode }): ReactN
 
     setWatchlist(newWatchlist);
 
-    localStorage.setItem('watchlist', JSON.stringify(newWatchlist));
+    localStorage.setItem('dummy_watchlist', JSON.stringify(newWatchlist));
 
   };
 

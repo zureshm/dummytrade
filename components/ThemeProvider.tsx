@@ -17,7 +17,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Load theme from localStorage on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as Theme;
+    const savedTheme = localStorage.getItem("dummy_theme") as Theme;
     if (savedTheme && ["default", "blue", "brown"].includes(savedTheme)) {
       setThemeState(savedTheme);
     }
@@ -30,7 +30,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     const html = document.documentElement;
     html.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
+    localStorage.setItem("dummy_theme", theme);
   }, [theme, mounted]);
 
   const setTheme = (newTheme: Theme) => {

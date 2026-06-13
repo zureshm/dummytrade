@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const authCookie = request.cookies.get("auth");
+  const authCookie = request.cookies.get("dummy_auth");
 
   if (!authCookie || authCookie.value !== "true") {
     return NextResponse.redirect(new URL("/login", request.url));

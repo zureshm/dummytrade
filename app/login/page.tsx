@@ -3,6 +3,7 @@ import { useState } from "react";
 import Image from "next/image";
 import styles from "./page.module.scss";
 import { useRouter } from "next/navigation";
+import { BASE_PATH } from "@/lib/basePath";
 
 
 export default function LoginPage() {
@@ -17,7 +18,7 @@ export default function LoginPage() {
       userId === process.env.NEXT_PUBLIC_APP_USERNAME &&
       apiKey === process.env.NEXT_PUBLIC_APP_PASSWORD
     ) {
-      document.cookie = "auth=true; path=/; max-age=86400";
+      document.cookie = "dummy_auth=true; path=/dummy; max-age=86400";
       router.push("/dashboard");
     } else {
       setError("Invalid credentials");
@@ -28,7 +29,7 @@ export default function LoginPage() {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.logo}>
-          <Image src="/logo.png" alt="SurAlgoApp" width={180} height={180} priority />
+          <Image src={`${BASE_PATH}/logo.png`} alt="SurAlgoApp" width={180} height={180} priority />
         </div>
         <hr className={styles.separator} />
 

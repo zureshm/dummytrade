@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { useTradeStore } from "../store/TradeStore";
 import { playSoundEvents } from "@/lib/sounds";
+import { BASE_PATH } from "@/lib/basePath";
 
 export function StrategyTimerProvider({ children }: { children: React.ReactNode }) {
   const { syncFromServer } = useTradeStore();
@@ -13,7 +14,7 @@ export function StrategyTimerProvider({ children }: { children: React.ReactNode 
   // browser-tab throttling.
   const pollServer = useCallback(async () => {
     try {
-      const res = await fetch("/api/trades");
+      const res = await fetch(`${BASE_PATH}/api/trades`);
       if (res.ok) {
         const state = await res.json();
         syncFromServer(state);
