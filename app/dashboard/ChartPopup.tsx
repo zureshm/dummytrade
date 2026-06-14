@@ -7,7 +7,7 @@ import { useTradeStore } from "../store/TradeStore";
 
 const STRATEGY_URL = process.env.NEXT_PUBLIC_STRATEGY_API_URL || "http://localhost:4000";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:2000";
-const NIFTY50_WS_URL = API_BASE_URL.replace(/^http/, "ws") + "/ws/nifty50";
+const NIFTY50_WS_URL = process.env.NEXT_PUBLIC_NIFTY50_WS_URL || API_BASE_URL.replace(/^http/, "ws") + "/ws/nifty50";
 
 type CandleData = {
   time: string;
@@ -525,7 +525,7 @@ export default function ChartPopup({ open, onClose }: Props) {
       }
 
       // Show last ~20 candles with some right padding
-      const visibleCandles = 25;
+      const visibleCandles = 30;
       chart.timeScale().setVisibleLogicalRange({
         from: candles.length - visibleCandles,
         to: candles.length + 5,
