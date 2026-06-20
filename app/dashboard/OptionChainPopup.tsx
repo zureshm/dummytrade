@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { X, Grid2X2, Plus, Check } from "lucide-react";
 import { useWatchlist } from "../store/WatchlistContext";
 
-const OPTION_CHAIN_URL = process.env.NEXT_PUBLIC_OPTION_CHAIN_URL || "http://localhost:8080";
+const OPTION_CHAIN_URL = process.env.NEXT_PUBLIC_OPTION_CHAIN_URL || "http://localhost:8080/api/option-chain";
 
 type OptionSide = {
   oi: number;
@@ -63,10 +63,12 @@ export default function OptionChainPopup({ open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"current" | "next">("current");
   const { watchlist, addToWatchlist } = useWatchlist();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const atmRef = useRef<HTMLTableRowElement | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`${OPTION_CHAIN_URL}/api/option-chain`);
+      const res = await fetch(`${OPTION_CHAIN_URL}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setData(json);
@@ -85,6 +87,16 @@ export default function OptionChainPopup({ open, onClose }: Props) {
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
   }, [open, fetchData]);
+
+  // Scroll to ATM row when data loads or tab changes
+  useEffect(() => {
+    if (!data) return;
+    setTimeout(() => {
+      if (atmRef.current) {
+        atmRef.current.scrollIntoView({ block: "center" });
+      }
+    }, 50);
+  }, [data, activeTab]);
 
   const isInWatchlist = (symbol: string) => {
     return watchlist.some((item) => item.symbol === symbol);
@@ -179,7 +191,7 @@ export default function OptionChainPopup({ open, onClose }: Props) {
             </div>
 
             {/* Table */}
-            <div className="overflow-y-auto flex-1" style={{ maxHeight: "55vh" }}>
+            <div ref={scrollRef} className="overflow-y-auto flex-1" style={{ maxHeight: "55vh" }}>
               <table className="w-full text-xs" style={{ borderCollapse: "collapse" }}>
                 <thead>
                   <tr
@@ -223,6 +235,7 @@ export default function OptionChainPopup({ open, onClose }: Props) {
                     return (
                       <tr
                         key={row.strikePrice}
+                        ref={isAtm ? atmRef : undefined}
                         style={{
                           borderBottom: "1px solid var(--theme-popup-field-border)",
                           background: isAtm
