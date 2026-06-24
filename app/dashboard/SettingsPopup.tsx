@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Settings, Volume2, Play, Palette } from "lucide-react";
+import { X, Settings, Play, Palette } from "lucide-react";
 import { playSound, setVolume } from "@/lib/sounds";
 import { useTheme } from "@/components/ThemeProvider";
 import { useTradeStore } from "../store/TradeStore";
@@ -11,16 +11,16 @@ const STRATEGY_URL = process.env.NEXT_PUBLIC_STRATEGY_API_URL || "http://localho
 // Friendly display names for strategy script names — edit these as needed
 const STRATEGY_DISPLAY_NAMES: Record<string, string> = {
   evaluateEMACross: "EMA Crossover",
-  surStrategy: "Sur Strategy",
+  surStrategy: "Suresh Strategy",
   chatGptStrategy: "ChatGPT Strategy",
-  claudSurStrategy: "Claude Sur Strategy",
+  claudSurStrategy: "Kumbhakarna V1",
   utGptStrategy: "UT GPT",
   utGptStrategy1: "UT GPT v1",
   utGptStrategy2: "UT GPT v2",
   utGptStrategy3: "UT GPT v3",
   superDoubleUT: "Super Double UT",
   superUTBotStrategy: "Super UT Bot",
-  doubleUTBotStrategy: "Double UT Bot",
+  VWAPUTBotStrategy: "Kumbhakarna V2",
   sumeshStrategy: "Sumesh Strategy",
   utGptStrategy4: "UT GPT v4",
   utGptStrategy4X: "UT GPT v4X",
@@ -108,7 +108,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
           background: "var(--theme-popup-bg)",
           color: "var(--theme-popup-text)",
           border: "3px solid var(--theme-popup-border)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",  maxWidth:"90%" 
+          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",  maxWidth:"90%"
         }}
         onClick={(e) => e.stopPropagation()}
       >
