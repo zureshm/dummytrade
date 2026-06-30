@@ -192,6 +192,10 @@ type WaitingTrade = {
 
 
 
+  targetMode: "live" | "candleClose";
+
+
+
   minToHoldEnabled: boolean;
 
 
@@ -209,6 +213,10 @@ type WaitingTrade = {
 
 
   trailingAfterTarget: number;
+
+
+
+  trailingMode: "live" | "candleClose";
 
 
 
@@ -329,6 +337,10 @@ type ActiveTrade = {
 
 
 
+  targetMode: "live" | "candleClose";
+
+
+
   minToHoldEnabled: boolean;
 
 
@@ -346,6 +358,10 @@ type ActiveTrade = {
 
 
   trailingAfterTarget: number;
+
+
+
+  trailingMode: "live" | "candleClose";
 
 
 
@@ -514,11 +530,19 @@ type TradeHistoryItem = {
 
 
 
+    targetMode?: "live" | "candleClose";
+
+
+
     trailingAfterTarget?: number;
 
 
 
     trailingAfterTargetEnabled: boolean;
+
+
+
+    trailingMode?: "live" | "candleClose";
 
 
 
@@ -606,11 +630,11 @@ const lastCandleLow: Record<string, number> = {};
 
 // Grace period after BUY: use only real-time LTP (not stale candle low/high) for SL/Target checks
 const lastBuyTimestamp: Record<string, number> = {};
-const BUY_GRACE_PERIOD_MS = 5000;
+const _BUY_GRACE_PERIOD_MS = 5000;
 
 // Grace period after minimum-target arming: ignore stale candle data for trigger check
-const trailingArmTimestamp: Record<string, number> = {};
-const TRAILING_ARM_GRACE_MS = 5000;
+const _trailingArmTimestamp: Record<string, number> = {};
+const _TRAILING_ARM_GRACE_MS = 5000;
 
 
 
@@ -1014,11 +1038,19 @@ function buildConfigSnapshot(trade: ActiveTrade): TradeHistoryItem["config"] {
 
 
 
+    targetMode: trade.targetPointsEnabled ? trade.targetMode : undefined,
+
+
+
     trailingAfterTargetEnabled: Boolean(trade.trailingAfterTargetEnabled),
 
 
 
     trailingAfterTarget: trade.trailingAfterTargetEnabled ? trade.trailingAfterTarget : undefined,
+
+
+
+    trailingMode: trade.trailingAfterTargetEnabled ? trade.trailingMode : undefined,
 
 
 
@@ -1214,6 +1246,10 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
 
 
+    targetMode: trade.targetMode,
+
+
+
     minToHoldEnabled: trade.minToHoldEnabled,
 
 
@@ -1231,6 +1267,10 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
 
     trailingAfterTarget: trade.trailingAfterTarget,
+
+
+
+    trailingMode: trade.trailingMode,
 
 
 
@@ -2168,6 +2208,7 @@ function updateHighWatermark(symbol: string, price: number) {
 
 
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function handleStrategySignal(signal: any) {
 
 
@@ -2764,7 +2805,13 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-    // Use only real-time LTP for all SL/Target/Trailing checks.
+    const targetPrice = trade.targetMode === "candleClose" && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
+
+    const trailingPrice = trade.trailingMode === "candleClose" && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
+
+
+
+    // Use real-time LTP for SL/Minimum Target. Target/Trailing may use LTP or last candle close based on mode.
     // Candle high/low from strategy signals are stale (previous completed candle)
     // and would cause phantom exits on wicks that LTP polling already handles.
 
@@ -3020,7 +3067,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-      const peakPrice = ltp;
+      const peakPrice = trailingPrice;
 
 
 
@@ -3040,7 +3087,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-      const currentPrice = ltp;
+      const currentPrice = trailingPrice;
 
 
 
@@ -3056,7 +3103,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-        completeCycleWithoutExit(trade.symbol, String(ltp), `Trailing target hit for ₹${ltp} at ${currentTime}`);
+        completeCycleWithoutExit(trade.symbol, String(trailingPrice), `Trailing target hit for ₹${trailingPrice} at ${currentTime}`);
 
 
 
@@ -3080,13 +3127,15 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-    if (trade.targetPointsEnabled && trade.targetPoints > 0 && (ltp - entry) >= trade.targetPoints) {
+    if (trade.targetPointsEnabled && trade.targetPoints > 0 && (targetPrice - entry) >= trade.targetPoints) {
 
 
 
       const targetLevel = entry + trade.targetPoints;
 
-      const tgtExit = priceDiff >= trade.targetPoints ? ltp : targetLevel;
+      const targetPriceDiff = targetPrice - entry;
+
+      const tgtExit = targetPriceDiff >= trade.targetPoints ? targetPrice : targetLevel;
 
 
 
