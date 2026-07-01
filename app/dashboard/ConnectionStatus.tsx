@@ -74,7 +74,7 @@ export default function ConnectionStatus() {
           <Network className="w-5 h-5" />
           CONNECTION STATUS
           <button
-            onClick={() => window.open("/log-monitor", "_blank")}
+            onClick={() => window.open("/dummy/log-monitor", "_blank")}
             className="ml-auto p-1 rounded hover:bg-zinc-100 transition-colors"
             title="Open Log Monitor"
           >
