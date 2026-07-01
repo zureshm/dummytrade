@@ -31,7 +31,8 @@ export const STRATEGY_DEFAULTS = {
     maxLoss: 2000,
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
-    reEntryPoints: 3
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   },
   allclear: {
     numberOfTrades: 5,
@@ -65,7 +66,8 @@ export const STRATEGY_DEFAULTS = {
     maxLoss: 900,
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
-    reEntryPoints: 3
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   },
   low: {
     numberOfTrades: 5,
@@ -99,7 +101,8 @@ export const STRATEGY_DEFAULTS = {
     maxLoss: 900,
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
-    reEntryPoints: 3
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   },
   medium: {
     numberOfTrades: 10,
@@ -133,7 +136,8 @@ export const STRATEGY_DEFAULTS = {
     maxLoss: 900,
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
-    reEntryPoints: 3
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   },
   high: {
     numberOfTrades: 5,
@@ -167,6 +171,7 @@ export const STRATEGY_DEFAULTS = {
     maxLoss: 1500,
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
-    reEntryPoints: 3
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   }
 };

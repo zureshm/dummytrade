@@ -42,6 +42,8 @@ export type WaitingTrade = {
   reEntryAfterTargetEnabled: boolean;
   reEntryCandles: number;
   reEntryPoints: number;
+  pendingSkippedBuy?: boolean;
+  signalReEntryEnabled: boolean;
 };
 
 // active trade shown in top running-trade card after strategy triggers it
@@ -92,6 +94,9 @@ export type ActiveTrade = {
   reEntryExitPrice?: number;
   reEntrySellTime?: string;
   reEntryReason?: string;
+  pendingSkippedBuy?: boolean;
+  signalReEntryEnabled: boolean;
+  signalReEntryArmed?: boolean;
 };
 
 export type TradeHistoryItem = {
@@ -314,6 +319,8 @@ export function TradeStoreProvider({
         reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
         reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
         reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
+        pendingSkippedBuy: false,
+        signalReEntryEnabled: readFormBool(sym, "signalReEntryEnabled", true),
       },
       ...waitingTrades,
     ];
@@ -391,6 +398,9 @@ export function TradeStoreProvider({
       reEntryAfterTargetEnabled: tradeToActivate.reEntryAfterTargetEnabled,
       reEntryCandles: tradeToActivate.reEntryCandles,
       reEntryPoints: tradeToActivate.reEntryPoints,
+      pendingSkippedBuy: false,
+      signalReEntryEnabled: tradeToActivate.signalReEntryEnabled,
+      signalReEntryArmed: false,
     };
 
     setActiveTrades((prev) => [...prev, newActiveTrade]);
