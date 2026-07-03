@@ -7,6 +7,7 @@ export const STRATEGY_DEFAULTS = {
     stopLossPercentage: 10,
     targetPointsEnabled: true,
     targetPoints: 20,
+    targetMode: "live",
     waitStrategyEnabled: true,
     buyOverrideSize: 15,
     waitAfterSellEnabled: true,
@@ -18,6 +19,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldTrigger: 2,
     trailingAfterTargetEnabled: true,
     trailingAfterTarget: 10,
+    trailingMode: "live",
     rangeEnabled: true,
     timeFrom: '09:20',
     timeFromAmpm: 'am',
@@ -26,7 +28,11 @@ export const STRATEGY_DEFAULTS = {
     lotValue: 1,
     maxProfitLossEnabled: false,
     maxProfit: 5000,
-    maxLoss: 2000
+    maxLoss: 2000,
+    reEntryAfterTargetEnabled: false,
+    reEntryCandles: 5,
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   },
   allclear: {
     numberOfTrades: 5,
@@ -36,6 +42,7 @@ export const STRATEGY_DEFAULTS = {
     stopLossPercentage: 5,
     targetPointsEnabled: false,
     targetPoints: 15,
+    targetMode: "live",
     waitStrategyEnabled: false,
     buyOverrideSize: 15,
     waitAfterSellEnabled: false,
@@ -47,6 +54,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldTrigger: 2,
     trailingAfterTargetEnabled: false,
     trailingAfterTarget: 10,
+    trailingMode: "live",
     rangeEnabled: false,
     timeFrom: '09:20',
     timeFromAmpm: 'am',
@@ -55,7 +63,11 @@ export const STRATEGY_DEFAULTS = {
     lotValue: 1,
     maxProfitLossEnabled: false,
     maxProfit: 1100,
-    maxLoss: 900
+    maxLoss: 900,
+    reEntryAfterTargetEnabled: false,
+    reEntryCandles: 5,
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   },
   low: {
     numberOfTrades: 5,
@@ -65,6 +77,7 @@ export const STRATEGY_DEFAULTS = {
     stopLossPercentage: 10,
     targetPointsEnabled: true,
     targetPoints: 10,
+    targetMode: "live",
     waitStrategyEnabled: true,
     buyOverrideSize: 15,
     waitAfterSellEnabled: false,
@@ -76,6 +89,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldTrigger: 1.5,
     trailingAfterTargetEnabled: true,
     trailingAfterTarget: 5,
+    trailingMode: "live",
     rangeEnabled: true,
     timeFrom: '09:20',
     timeFromAmpm: 'am',
@@ -84,7 +98,11 @@ export const STRATEGY_DEFAULTS = {
     lotValue: 1,
     maxProfitLossEnabled: true,
     maxProfit: 1400,
-    maxLoss: 900
+    maxLoss: 900,
+    reEntryAfterTargetEnabled: false,
+    reEntryCandles: 5,
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   },
   medium: {
     numberOfTrades: 10,
@@ -94,6 +112,7 @@ export const STRATEGY_DEFAULTS = {
     stopLossPercentage: 10,
     targetPointsEnabled: true,
     targetPoints: 10,
+    targetMode: "live",
     waitStrategyEnabled: false,
     buyOverrideSize: 25,
     waitAfterSellEnabled: false,
@@ -105,6 +124,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldTrigger: 4,
     trailingAfterTargetEnabled: true,
     trailingAfterTarget: 5,
+    trailingMode: "live",
     rangeEnabled: false,
     timeFrom: '09:20',
     timeFromAmpm: 'am',
@@ -113,7 +133,11 @@ export const STRATEGY_DEFAULTS = {
     lotValue: 1,
     maxProfitLossEnabled: false,
     maxProfit: 1400,
-    maxLoss: 900
+    maxLoss: 900,
+    reEntryAfterTargetEnabled: false,
+    reEntryCandles: 5,
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   },
   high: {
     numberOfTrades: 5,
@@ -123,6 +147,7 @@ export const STRATEGY_DEFAULTS = {
     stopLossPercentage: 10,
     targetPointsEnabled: true,
     targetPoints: 30,
+    targetMode: "live",
     waitStrategyEnabled: false,
     buyOverrideSize: 15,
     waitAfterSellEnabled: false,
@@ -134,6 +159,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldTrigger: 4,
     trailingAfterTargetEnabled: true,
     trailingAfterTarget: 12,
+    trailingMode: "live",
     rangeEnabled: true,
     timeFrom: '09:20',
     timeFromAmpm: 'am',
@@ -142,6 +168,10 @@ export const STRATEGY_DEFAULTS = {
     lotValue: 1,
     maxProfitLossEnabled: true,
     maxProfit: 4500,
-    maxLoss: 1500
+    maxLoss: 1500,
+    reEntryAfterTargetEnabled: false,
+    reEntryCandles: 5,
+    reEntryPoints: 3,
+    signalReEntryEnabled: true
   }
 };

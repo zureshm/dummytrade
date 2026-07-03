@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useCallback, useMemo, useRef, useState } from "react";
+import React, { createContext, useContext, useCallback, useRef, useState } from "react";
 
 type TradeSelection = {
   symbol: string;
@@ -19,11 +19,13 @@ export type WaitingTrade = {
   stopLossNumber: number;
   targetPointsEnabled: boolean;
   targetPoints: number;
+  targetMode: "live" | "candleClose";
   minToHoldEnabled: boolean;
   minToHold: number;
   minToHoldTrigger: number;
   trailingAfterTargetEnabled: boolean;
   trailingAfterTarget: number;
+  trailingMode: "live" | "candleClose";
   rangeEnabled: boolean;
   timeFrom: string;
   timeFromAmpm: string;
@@ -40,6 +42,8 @@ export type WaitingTrade = {
   reEntryAfterTargetEnabled: boolean;
   reEntryCandles: number;
   reEntryPoints: number;
+  pendingSkippedBuy?: boolean;
+  signalReEntryEnabled: boolean;
 };
 
 // active trade shown in top running-trade card after strategy triggers it
@@ -55,11 +59,13 @@ export type ActiveTrade = {
   stopLossNumber: number;
   targetPointsEnabled: boolean;
   targetPoints: number;
+  targetMode: "live" | "candleClose";
   minToHoldEnabled: boolean;
   minToHold: number;
   minToHoldTrigger: number;
   trailingAfterTargetEnabled: boolean;
   trailingAfterTarget: number;
+  trailingMode: "live" | "candleClose";
   trailingTrailActive: boolean;
   trailingHighWatermark?: number;
   rangeEnabled: boolean;
@@ -88,6 +94,9 @@ export type ActiveTrade = {
   reEntryExitPrice?: number;
   reEntrySellTime?: string;
   reEntryReason?: string;
+  pendingSkippedBuy?: boolean;
+  signalReEntryEnabled: boolean;
+  signalReEntryArmed?: boolean;
 };
 
 export type TradeHistoryItem = {
@@ -102,8 +111,10 @@ export type TradeHistoryItem = {
     stopLossNumberEnabled: boolean;
     targetPoints?: number;
     targetPointsEnabled: boolean;
+    targetMode?: "live" | "candleClose";
     trailingAfterTarget?: number;
     trailingAfterTargetEnabled: boolean;
+    trailingMode?: "live" | "candleClose";
     minToHold?: number;
     minToHoldEnabled: boolean;
     minToHoldTrigger?: number;
@@ -116,8 +127,10 @@ type TradeConfigSnapshotSource = {
   stopLossNumber: number;
   targetPointsEnabled: boolean;
   targetPoints: number;
+  targetMode: "live" | "candleClose";
   trailingAfterTargetEnabled: boolean;
   trailingAfterTarget: number;
+  trailingMode: "live" | "candleClose";
   minToHoldEnabled: boolean;
   minToHold: number;
   minToHoldTrigger: number;
@@ -131,8 +144,10 @@ const buildTradeConfigSnapshot = (
   stopLossNumber: trade.stopLossNumberEnabled ? trade.stopLossNumber : undefined,
   targetPointsEnabled: Boolean(trade.targetPointsEnabled),
   targetPoints: trade.targetPointsEnabled ? trade.targetPoints : undefined,
+  targetMode: trade.targetPointsEnabled ? trade.targetMode : undefined,
   trailingAfterTargetEnabled: Boolean(trade.trailingAfterTargetEnabled),
   trailingAfterTarget: trade.trailingAfterTargetEnabled ? trade.trailingAfterTarget : undefined,
+  trailingMode: trade.trailingAfterTargetEnabled ? trade.trailingMode : undefined,
   minToHoldEnabled: Boolean(trade.minToHoldEnabled),
   minToHold: trade.minToHoldEnabled ? trade.minToHold : undefined,
   minToHoldTrigger: trade.minToHoldEnabled ? trade.minToHoldTrigger : undefined,
@@ -190,12 +205,19 @@ type TradeStoreValue = {
     activeTrades: ActiveTrade[];
     tradeHistory: TradeHistoryItem[];
     lastStrategyCandleTime: string;
+    symbolsWithFirstSignal?: string[];
+    symbolHistoryStatus?: Record<string, { status: string; candleCount: number }>;
   }) => void;
+
+  // symbols that have received at least one valid signal (loader tracking)
+  initializedSymbols: Set<string>;
+  // per-symbol history fetch status from feed server
+  symbolHistoryStatus: Record<string, { status: string; candleCount: number }>;
 };
 
 const TradeStoreContext = createContext<TradeStoreValue | null>(null);
 
-function readFormField(symbol: string, field: string, fallback: any) {
+function readFormField(symbol: string, field: string, fallback: unknown) {
   try {
     const saved = localStorage.getItem("dummy_tradeForm_" + symbol);
     if (!saved) return fallback;
@@ -233,6 +255,8 @@ export function TradeStoreProvider({
   const [waitingTrades, setWaitingTrades] = useState<WaitingTrade[]>([]);
   const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>([]);
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>([]);
+  const [initializedSymbols, setInitializedSymbols] = useState<Set<string>>(new Set());
+  const [symbolHistoryStatus, setSymbolHistoryStatus] = useState<Record<string, { status: string; candleCount: number }>>({});
 
   // Track whether we've done the initial sync from server
   const initialSyncDone = useRef(false);
@@ -270,11 +294,13 @@ export function TradeStoreProvider({
         stopLossNumber: readFormNumber(sym, "stopLossNumber", 15),
         targetPointsEnabled: readFormBool(sym, "targetPointsEnabled", true),
         targetPoints: readFormNumber(sym, "targetPoints", 20),
+        targetMode: readFormString(sym, "targetMode", "live") as "live" | "candleClose",
         minToHoldEnabled: readFormBool(sym, "minToHoldEnabled", false),
         minToHold: readFormNumber(sym, "minToHold", 8),
         minToHoldTrigger: readFormNumber(sym, "minToHoldTrigger", 2),
         trailingAfterTargetEnabled: readFormBool(sym, "trailingAfterTargetEnabled", false),
         trailingAfterTarget: readFormNumber(sym, "trailingAfterTarget", 15),
+        trailingMode: readFormString(sym, "trailingMode", "live") as "live" | "candleClose",
         rangeEnabled: readFormBool(sym, "rangeEnabled", false),
         timeFrom: readFormString(sym, "timeFrom", "10:00"),
         timeFromAmpm: readFormString(sym, "timeFromAmpm", "am"),
@@ -302,6 +328,8 @@ export function TradeStoreProvider({
         reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
         reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
         reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
+        pendingSkippedBuy: false,
+        signalReEntryEnabled: readFormBool(sym, "signalReEntryEnabled", true),
       },
       ...waitingTrades,
     ];
@@ -347,11 +375,13 @@ export function TradeStoreProvider({
       stopLossNumber: tradeToActivate.stopLossNumber,
       targetPointsEnabled: tradeToActivate.targetPointsEnabled,
       targetPoints: tradeToActivate.targetPoints,
+      targetMode: tradeToActivate.targetMode,
       minToHoldEnabled: tradeToActivate.minToHoldEnabled,
       minToHold: tradeToActivate.minToHold,
       minToHoldTrigger: tradeToActivate.minToHoldTrigger,
       trailingAfterTargetEnabled: tradeToActivate.trailingAfterTargetEnabled,
       trailingAfterTarget: tradeToActivate.trailingAfterTarget,
+      trailingMode: tradeToActivate.trailingMode,
       trailingTrailActive: false,
       trailingHighWatermark: undefined,
       rangeEnabled: tradeToActivate.rangeEnabled,
@@ -377,6 +407,9 @@ export function TradeStoreProvider({
       reEntryAfterTargetEnabled: tradeToActivate.reEntryAfterTargetEnabled,
       reEntryCandles: tradeToActivate.reEntryCandles,
       reEntryPoints: tradeToActivate.reEntryPoints,
+      pendingSkippedBuy: false,
+      signalReEntryEnabled: tradeToActivate.signalReEntryEnabled,
+      signalReEntryArmed: false,
     };
 
     setActiveTrades((prev) => [...prev, newActiveTrade]);
@@ -699,6 +732,8 @@ export function TradeStoreProvider({
     activeTrades: ActiveTrade[];
     tradeHistory: TradeHistoryItem[];
     lastStrategyCandleTime: string;
+    symbolsWithFirstSignal?: string[];
+    symbolHistoryStatus?: Record<string, { status: string; candleCount: number }>;
   }) => {
     // On first sync (page load/refresh), populate waitingTrades from server.
     // After that, waitingTrades is frontend-owned — only remove trades that
@@ -737,40 +772,49 @@ export function TradeStoreProvider({
     if (state.lastStrategyCandleTime) {
       lastStrategyCandleTimeRef.current = state.lastStrategyCandleTime;
     }
+    if (Array.isArray(state.symbolsWithFirstSignal) && state.symbolsWithFirstSignal.length > 0) {
+      setInitializedSymbols((prev) => {
+        const next = new Set(prev);
+        for (const sym of state.symbolsWithFirstSignal!) next.add(sym);
+        return next;
+      });
+    }
+    if (state.symbolHistoryStatus) {
+      setSymbolHistoryStatus(state.symbolHistoryStatus);
+    }
   }, []);
 
-  const value = useMemo(
-    () => ({
-      selection,
-      setSelection,
-      forceBuyEnabled,
-      setForceBuyEnabled,
-      waitingTrades,
-      addWaitingTradeFromSelection,
-      removeWaitingTrade,
-      addLogToWaitingTrade,
-      activeTrades,
-      activateWaitingTrade,
-      completeActiveTrade,
-      completeCycleWithoutExit,
-      updateActiveTradeBuy,
-      removeActiveTrade,
-      logManualExit,
-      removeTradeAndFreeSymbol,
-      addLogToActiveTrade,
-      activateTrailingAfterTarget,
-      updateTrailingHighWatermark,
-      updateLastSellCandleTime,
-      tradeHistory,
-      addTradeHistoryEntry,
-      removeTradeHistoryEntry,
-      clearTradeHistory,
-      getLastStrategyCandleTime,
-      setLastStrategyCandleTime,
-      syncFromServer,
-    }),
-    [selection, forceBuyEnabled, waitingTrades, activeTrades, tradeHistory, syncFromServer]
-  );
+  const value: TradeStoreValue = {
+    selection,
+    initializedSymbols,
+    symbolHistoryStatus,
+    setSelection,
+    forceBuyEnabled,
+    setForceBuyEnabled,
+    waitingTrades,
+    addWaitingTradeFromSelection,
+    removeWaitingTrade,
+    addLogToWaitingTrade,
+    activeTrades,
+    activateWaitingTrade,
+    completeActiveTrade,
+    completeCycleWithoutExit,
+    updateActiveTradeBuy,
+    removeActiveTrade,
+    logManualExit,
+    removeTradeAndFreeSymbol,
+    addLogToActiveTrade,
+    activateTrailingAfterTarget,
+    updateTrailingHighWatermark,
+    updateLastSellCandleTime,
+    tradeHistory,
+    addTradeHistoryEntry,
+    removeTradeHistoryEntry,
+    clearTradeHistory,
+    getLastStrategyCandleTime,
+    setLastStrategyCandleTime,
+    syncFromServer,
+  };
 
   return (
     <TradeStoreContext.Provider value={value}>

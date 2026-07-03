@@ -32,15 +32,18 @@ export default function TradePage() {
     setStopLossPercentage(defaults.stopLossPercentage);
     setTargetPointsEnabled(defaults.targetPointsEnabled);
     setTargetPoints(defaults.targetPoints);
+    setTargetMode((defaults.targetMode as "live" | "candleClose") || "live");
+    setTrailingMode((defaults.trailingMode as "live" | "candleClose") || "live");
+    setPriceMode((defaults.targetMode as "live" | "candleClose") || "live");
     setWaitStrategyEnabled(defaults.waitStrategyEnabled);
     setBuyOverrideSize(defaults.buyOverrideSize);
     setWaitAfterSellEnabled(defaults.waitAfterSellEnabled);
     setWaitAfterSellCandles(defaults.waitAfterSellCandles);
-    if ('sellWhenLossCandlesEnabled' in defaults) setSellWhenLossCandlesEnabled((defaults as any).sellWhenLossCandlesEnabled);
-    if ('sellWhenLossCandles' in defaults) setSellWhenLossCandles((defaults as any).sellWhenLossCandles);
+    setSellWhenLossCandlesEnabled(defaults.sellWhenLossCandlesEnabled);
+    setSellWhenLossCandles(defaults.sellWhenLossCandles);
     setMinToHoldEnabled(defaults.minToHoldEnabled);
     setMinToHold(defaults.minToHold);
-    if ('minToHoldTrigger' in defaults) setMinToHoldTrigger((defaults as any).minToHoldTrigger);
+    setMinToHoldTrigger(defaults.minToHoldTrigger);
     setTrailingAfterTargetEnabled(defaults.trailingAfterTargetEnabled);
     setTrailingAfterTarget(defaults.trailingAfterTarget);
     setRangeEnabled(defaults.rangeEnabled);
@@ -49,12 +52,13 @@ export default function TradePage() {
     setTimeTo(defaults.timeTo);
     setTimeToAmpm(defaults.timeToAmpm);
     setLotValue(defaults.lotValue);
-    if ('maxProfitLossEnabled' in defaults) setMaxProfitLossEnabled((defaults as any).maxProfitLossEnabled);
-    if ('maxProfit' in defaults) setMaxProfit((defaults as any).maxProfit);
-    if ('maxLoss' in defaults) setMaxLoss((defaults as any).maxLoss);
-    if ('reEntryAfterTargetEnabled' in defaults) setReEntryAfterTargetEnabled((defaults as any).reEntryAfterTargetEnabled);
-    if ('reEntryCandles' in defaults) setReEntryCandles((defaults as any).reEntryCandles);
-    if ('reEntryPoints' in defaults) setReEntryPoints((defaults as any).reEntryPoints);
+    setMaxProfitLossEnabled(defaults.maxProfitLossEnabled);
+    setMaxProfit(defaults.maxProfit);
+    setMaxLoss(defaults.maxLoss);
+    setReEntryAfterTargetEnabled(defaults.reEntryAfterTargetEnabled);
+    setReEntryCandles(defaults.reEntryCandles);
+    setReEntryPoints(defaults.reEntryPoints);
+    setSignalReEntryEnabled(defaults.signalReEntryEnabled ?? true);
   };
 
   // Handle strategy change
@@ -70,6 +74,9 @@ export default function TradePage() {
   const [stopLossPercentage, setStopLossPercentage] = useState(10);
   const [targetPointsEnabled, setTargetPointsEnabled] = useState(true);
   const [targetPoints, setTargetPoints] = useState(20);
+  const [targetMode, setTargetMode] = useState<"live" | "candleClose">("live");
+  const [trailingMode, setTrailingMode] = useState<"live" | "candleClose">("live");
+  const [priceMode, setPriceMode] = useState<"live" | "candleClose">("live");
   const [waitStrategyEnabled, setWaitStrategyEnabled] = useState(false);
   const [buyOverrideSize, setBuyOverrideSize] = useState(15);
   const [waitAfterSellEnabled, setWaitAfterSellEnabled] = useState(true);
@@ -87,6 +94,9 @@ export default function TradePage() {
   const [reEntryCandles, setReEntryCandles] = useState(5);
   const [reEntryPoints, setReEntryPoints] = useState(3);
   const [isReEntryInfoOpen, setIsReEntryInfoOpen] = useState(false);
+  const [signalReEntryEnabled, setSignalReEntryEnabled] = useState(true);
+  const [isSignalReEntryInfoOpen, setIsSignalReEntryInfoOpen] = useState(false);
+  const [isCandleSizeInfoOpen, setIsCandleSizeInfoOpen] = useState(false);
   const [rangeEnabled, setRangeEnabled] = useState(true);
   const [timeFrom, setTimeFrom] = useState('10:00');
   const [timeFromAmpm, setTimeFromAmpm] = useState('am');
@@ -114,10 +124,7 @@ export default function TradePage() {
   }, [price, stopLossPercentage, stopLossPercentageEnabled]);
 
   useEffect(() => {
-    if (!selection?.symbol) {
-      setCurrentPrice(null);
-      return;
-    }
+    if (!selection?.symbol) return;
 
     const fetchPrice = async () => {
       const prices = await getPrices([selection.symbol]);
@@ -130,51 +137,63 @@ export default function TradePage() {
 
     const interval = setInterval(fetchPrice, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      setCurrentPrice(null);
+    };
   }, [selection?.symbol]);
 
   useEffect(() => {
     if (!selection?.symbol) return;
 
-    const saved = localStorage.getItem('dummy_tradeForm_' + selection.symbol);
-    if (saved) {
-      const data = JSON.parse(saved);
-      setStrategy(data.strategy || 'nifty');
-      setNumberOfTrades(data.numberOfTrades || 5);
-      setStopLossNumberEnabled(Boolean(data.stopLossNumberEnabled ?? true));
-      setStopLossNumber(data.stopLossNumber || 15);
-      setStopLossPercentageEnabled(Boolean(data.stopLossPercentageEnabled ?? false));
-      setStopLossPercentage(data.stopLossPercentage || 10);
-      setTargetPointsEnabled(Boolean(data.targetPointsEnabled ?? true));
-      setTargetPoints(data.targetPoints || 20);
-      setWaitStrategyEnabled(Boolean(data.waitStrategyEnabled ?? false));
-      setBuyOverrideSize(data.buyOverrideSize || 15);
-      setWaitAfterSellEnabled(Boolean(data.waitAfterSellEnabled ?? true));
-      setWaitAfterSellCandles(data.waitAfterSellCandles || 8);
-      setSellWhenLossCandlesEnabled(Boolean(data.sellWhenLossCandlesEnabled ?? false));
-      setSellWhenLossCandles(data.sellWhenLossCandles || 5);
-      setMinToHoldEnabled(Boolean(data.minToHoldEnabled ?? false));
-      setMinToHold(data.minToHold || 8);
-      setMinToHoldTrigger(data.minToHoldTrigger || 2);
-      setTrailingAfterTargetEnabled(Boolean(data.trailingAfterTargetEnabled ?? false));
-      setTrailingAfterTarget(data.trailingAfterTarget || 15);
-      setRangeEnabled(Boolean(data.rangeEnabled ?? false));
-      setTimeFrom(data.timeFrom || '10:00');
-      setTimeFromAmpm(data.timeFromAmpm || 'am');
-      setTimeTo(data.timeTo || '02:45');
-      setTimeToAmpm(data.timeToAmpm || 'pm');
-      setLotValue(data.lotValue || 1);
-      setMaxProfitLossEnabled(Boolean(data.maxProfitLossEnabled ?? false));
-      setMaxProfit(data.maxProfit || 1100);
-      setMaxLoss(data.maxLoss || 900);
-      setReEntryAfterTargetEnabled(Boolean(data.reEntryAfterTargetEnabled ?? false));
-      setReEntryCandles(data.reEntryCandles || 5);
-      setReEntryPoints(data.reEntryPoints || 3);
-    } else {
-      // Reset to defaults
-      setStrategy('default');
-      applyStrategyDefaults('default');
-    }
+    const loadSavedForm = () => {
+      const saved = localStorage.getItem('dummy_tradeForm_' + selection.symbol);
+      if (saved) {
+        const data = JSON.parse(saved);
+        setStrategy(data.strategy || 'nifty');
+        setNumberOfTrades(data.numberOfTrades || 5);
+        setStopLossNumberEnabled(Boolean(data.stopLossNumberEnabled ?? true));
+        setStopLossNumber(data.stopLossNumber || 15);
+        setStopLossPercentageEnabled(Boolean(data.stopLossPercentageEnabled ?? false));
+        setStopLossPercentage(data.stopLossPercentage || 10);
+        setTargetPointsEnabled(Boolean(data.targetPointsEnabled ?? true));
+        setTargetPoints(data.targetPoints || 20);
+        const savedTargetMode = data.targetMode === "candleClose" ? "candleClose" : "live";
+        const savedTrailingMode = data.trailingMode === "candleClose" ? "candleClose" : "live";
+        setTargetMode(savedTargetMode);
+        setTrailingMode(savedTrailingMode);
+        setPriceMode(savedTargetMode);
+        setWaitStrategyEnabled(Boolean(data.waitStrategyEnabled ?? false));
+        setBuyOverrideSize(data.buyOverrideSize || 15);
+        setWaitAfterSellEnabled(Boolean(data.waitAfterSellEnabled ?? true));
+        setWaitAfterSellCandles(data.waitAfterSellCandles || 8);
+        setSellWhenLossCandlesEnabled(Boolean(data.sellWhenLossCandlesEnabled ?? false));
+        setSellWhenLossCandles(data.sellWhenLossCandles || 5);
+        setMinToHoldEnabled(Boolean(data.minToHoldEnabled ?? false));
+        setMinToHold(data.minToHold || 8);
+        setMinToHoldTrigger(data.minToHoldTrigger || 2);
+        setTrailingAfterTargetEnabled(Boolean(data.trailingAfterTargetEnabled ?? false));
+        setTrailingAfterTarget(data.trailingAfterTarget || 15);
+        setRangeEnabled(Boolean(data.rangeEnabled ?? false));
+        setTimeFrom(data.timeFrom || '10:00');
+        setTimeFromAmpm(data.timeFromAmpm || 'am');
+        setTimeTo(data.timeTo || '02:45');
+        setTimeToAmpm(data.timeToAmpm || 'pm');
+        setLotValue(data.lotValue || 1);
+        setMaxProfitLossEnabled(Boolean(data.maxProfitLossEnabled ?? false));
+        setMaxProfit(data.maxProfit || 1100);
+        setMaxLoss(data.maxLoss || 900);
+        setReEntryAfterTargetEnabled(Boolean(data.reEntryAfterTargetEnabled ?? false));
+        setReEntryCandles(data.reEntryCandles || 5);
+        setReEntryPoints(data.reEntryPoints || 3);
+        setSignalReEntryEnabled(Boolean(data.signalReEntryEnabled ?? true));
+      } else {
+        // Reset to defaults
+        setStrategy('default');
+        applyStrategyDefaults('default');
+      }
+    };
+    queueMicrotask(loadSavedForm);
   }, [selection?.symbol]);
 
   const saveForm = () => {
@@ -188,6 +207,8 @@ export default function TradePage() {
       stopLossPercentage,
       targetPointsEnabled,
       targetPoints,
+      targetMode,
+      trailingMode,
       minToHoldEnabled,
       minToHold,
       minToHoldTrigger,
@@ -214,6 +235,7 @@ export default function TradePage() {
       reEntryAfterTargetEnabled,
       reEntryCandles,
       reEntryPoints,
+      signalReEntryEnabled,
     };
     localStorage.setItem('dummy_tradeForm_' + selection.symbol, JSON.stringify(formData));
   };
@@ -343,6 +365,24 @@ export default function TradePage() {
                 <label htmlFor="waitStrategyEnabled" className="text-sm font-medium">
                   Wait when candle size ≥
                 </label>
+                <div className="relative inline-flex">
+                  <button
+                    type="button"
+                    className="flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:text-gray-700"
+                    onClick={() => setIsCandleSizeInfoOpen((prev) => !prev)}
+                    aria-label="Wait candle size info"
+                  >
+                    <HelpCircle className="h-3 w-3" />
+                  </button>
+                  {isCandleSizeInfoOpen && (
+                    <div
+                      className="absolute left-0 top-7 w-64 rounded-md p-2 text-white shadow-lg"
+                      style={{ zIndex: 9, background: "rgba(0,0,0,0.8)", fontSize: "11px", lineHeight: "18px" }}
+                    >
+                      When a BUY signal is skipped because the candle is too large, the trade remembers this. If the next signal before any other BUY is a REENTER from the strategy, it will enter at that point as if a BUY occurred.
+                    </div>
+                  )}
+                </div>
                 <input
                   type="number"
                   value={buyOverrideSize}
@@ -425,6 +465,102 @@ export default function TradePage() {
                     disabled={!targetPointsEnabled}
                   />
                 </div>
+
+                <div className="flex items-center space-x-4 pl-6 pt-1">
+                  <label className={`text-sm ${targetPointsEnabled ? "" : "text-gray-400"}`}>Use price:</label>
+                  <label className={`flex items-center space-x-1 text-sm ${targetPointsEnabled ? "" : "text-gray-400"}`}>
+                    <input
+                      type="radio"
+                      name="priceMode"
+                      value="live"
+                      checked={priceMode === "live"}
+                      onChange={(e) => {
+                        const mode = e.target.value as "live" | "candleClose";
+                        setPriceMode(mode);
+                        setTargetMode(mode);
+                        setTrailingMode(mode);
+                      }}
+                      className="h-3 w-3"
+                      disabled={!targetPointsEnabled}
+                    />
+                    <span>LTP</span>
+                  </label>
+                  <label className={`flex items-center space-x-1 text-sm ${targetPointsEnabled ? "" : "text-gray-400"}`}>
+                    <input
+                      type="radio"
+                      name="priceMode"
+                      value="candleClose"
+                      checked={priceMode === "candleClose"}
+                      onChange={(e) => {
+                        const mode = e.target.value as "live" | "candleClose";
+                        setPriceMode(mode);
+                        setTargetMode(mode);
+                        setTrailingMode(mode);
+                      }}
+                      className="h-3 w-3"
+                      disabled={!targetPointsEnabled}
+                    />
+                    <span>Candle close</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="trailingAfterTargetEnabled"
+                      checked={trailingAfterTargetEnabled}
+                      onChange={(e) => setTrailingAfterTargetEnabled(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="trailingAfterTargetEnabled" className="text-sm font-medium">
+                      Trailing SL <span className="text-xs text-gray-500 font-normal">({priceMode === "candleClose" ? "Candle close" : "Live price"})</span>
+                    </label>
+                  </div>
+
+                  <div className="relative">
+                    <button
+                      type="button"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:text-gray-700"
+                      onClick={() => setIsTrailingAfterInfoOpen((prev) => !prev)}
+                      aria-label="Trailing SL info"
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                    {isTrailingAfterInfoOpen && (
+                      <div
+                        className="absolute right-0 mt-2 w-60 rounded-md p-2 text-white shadow-lg"
+                        style={{
+                          zIndex: 9,
+                          background: "rgba(0, 0, 0, 0.8)",
+                          fontSize: "11px",
+                          lineHeight: "18px",
+                        }}
+                      >
+                        Once your primary target is hit, this trailing stop-loss keeps following price by the number of points you set. If price reverses by that amount, profits are locked automatically.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2 pl-6">
+                  <label
+                    htmlFor="trailingAfterTargetValue"
+                    className={`text-sm ${trailingAfterTargetEnabled ? "" : "text-gray-400"}`}
+                  >
+                    Points
+                  </label>
+                  <Input
+                    id="trailingAfterTargetValue"
+                    type="number"
+                    value={trailingAfterTarget}
+                    onChange={(e) => setTrailingAfterTarget(Number(e.target.value) || 0)}
+                    className="w-20 h-8"
+                    disabled={!trailingAfterTargetEnabled}
+                  />
+                </div>
               </div>
 
               <div className="rounded-md border border-gray-200 p-3 space-y-3">
@@ -492,70 +628,12 @@ export default function TradePage() {
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
-                      id="trailingAfterTargetEnabled"
-                      checked={trailingAfterTargetEnabled}
-                      onChange={(e) => setTrailingAfterTargetEnabled(e.target.checked)}
-                      className="h-4 w-4"
-                    />
-                    <label htmlFor="trailingAfterTargetEnabled" className="text-sm font-medium">
-                      Trailing SL
-                    </label>
-                  </div>
-
-                  <div className="relative">
-                    <button
-                      type="button"
-                      className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:text-gray-700"
-                      onClick={() => setIsTrailingAfterInfoOpen((prev) => !prev)}
-                      aria-label="Trailing SL info"
-                    >
-                      <HelpCircle className="h-3.5 w-3.5" />
-                    </button>
-                    {isTrailingAfterInfoOpen && (
-                      <div
-                        className="absolute right-0 mt-2 w-60 rounded-md p-2 text-white shadow-lg"
-                        style={{
-                          zIndex: 9,
-                          background: "rgba(0, 0, 0, 0.8)",
-                          fontSize: "11px",
-                          lineHeight: "18px",
-                        }}
-                      >
-                        Once your primary target is hit, this trailing stop-loss keeps following price by the number of points you set. If price reverses by that amount, profits are locked automatically.
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 pl-6">
-                  <label
-                    htmlFor="trailingAfterTargetValue"
-                    className={`text-sm ${trailingAfterTargetEnabled ? "" : "text-gray-400"}`}
-                  >
-                    Points
-                  </label>
-                  <Input
-                    id="trailingAfterTargetValue"
-                    type="number"
-                    value={trailingAfterTarget}
-                    onChange={(e) => setTrailingAfterTarget(Number(e.target.value) || 0)}
-                    className="w-20 h-8"
-                    disabled={!trailingAfterTargetEnabled}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-md border border-gray-200 p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
                       id="reEntryAfterTargetEnabled"
                       checked={reEntryAfterTargetEnabled}
                       onChange={(e) => setReEntryAfterTargetEnabled(e.target.checked)}
                       className="h-4 w-4"
                     />
-                    <label htmlFor="reEntryAfterTargetEnabled" className="text-sm font-medium" style={{color:'red'}}>Re-entry Condition</label>
+                    <label htmlFor="reEntryAfterTargetEnabled" className="text-sm font-medium" style={{color:'red'}}>Auto Re-entry Condition</label>
                   </div>
 
                   <div className="relative">
@@ -609,6 +687,40 @@ export default function TradePage() {
                     disabled={!reEntryAfterTargetEnabled}
                   />
                   <span className={`text-sm ${reEntryAfterTargetEnabled ? "" : "text-gray-400"}`}>Candles</span>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="signalReEntryEnabled"
+                      checked={signalReEntryEnabled}
+                      onChange={(e) => setSignalReEntryEnabled(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="signalReEntryEnabled" className="text-sm font-medium" style={{color:'red'}}>Signal Re-entry</label>
+                  </div>
+
+                  <div className="relative">
+                    <button
+                      type="button"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:text-gray-700"
+                      onClick={() => setIsSignalReEntryInfoOpen((prev) => !prev)}
+                      aria-label="Signal Re-entry info"
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                    {isSignalReEntryInfoOpen && (
+                      <div
+                        className="absolute right-0 mt-2 w-64 rounded-md p-2 text-white shadow-lg"
+                        style={{ zIndex: 9, background: "rgba(0,0,0,0.8)", fontSize: "11px", lineHeight: "18px" }}
+                      >
+                        After a profitable exit (Target, Trailing SL, or Minimum Target), if the strategy sends a REENTER signal, the trade will re-enter immediately. Applies configured guards (candle size, time range, wait-after-sell) if they are enabled. Does not apply for stop-loss or loss exits.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -768,11 +880,13 @@ export default function TradePage() {
                         stopLossNumber,
                         targetPointsEnabled,
                         targetPoints,
+                        targetMode,
                         minToHoldEnabled,
                         minToHold,
                         minToHoldTrigger,
                         trailingAfterTargetEnabled,
                         trailingAfterTarget,
+                        trailingMode,
                         rangeEnabled,
                         timeFrom,
                         timeFromAmpm,
@@ -789,6 +903,7 @@ export default function TradePage() {
                         reEntryAfterTargetEnabled,
                         reEntryCandles,
                         reEntryPoints,
+                        signalReEntryEnabled,
                       }),
                     }).catch(() => {});
 

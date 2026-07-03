@@ -4,7 +4,7 @@ export function middleware(request: NextRequest) {
   const authCookie = request.cookies.get("dummy_auth");
 
   if (!authCookie || authCookie.value !== "true") {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/dummy/login", request.url));
   }
 
   return NextResponse.next();
