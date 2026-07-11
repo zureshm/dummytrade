@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Activity, Zap, XCircle, Loader2, AlertTriangle } from "lucide-react";
 import styles from "./ActiveTrade.module.scss";
@@ -69,12 +68,11 @@ export default function ActiveTrade({
   waitingTrades,
   activeLtps,
   isHydrated,
-  strategyLastCandleTime,
   onManualExit,
   onCancelWaiting,
 }: Props) {
   const [mounted, setMounted] = useState(false);
-  const { removeTradeAndFreeSymbol, forceBuyEnabled, initializedSymbols, symbolHistoryStatus } = useTradeStore();
+  const { removeTradeAndFreeSymbol, forceBuyEnabled, initializedSymbols, symbolHistoryStatus, aiSuggestions, aiGuardActive, aiRegime, aiSymbolEnabled } = useTradeStore();
 
   // Track when each waiting symbol was first seen — for 30s loader timeout
   // Stored in state (not ref) so it is safe to read during render.
@@ -82,6 +80,7 @@ export default function ActiveTrade({
 
   // Register add-time for new symbols; clean up removed ones
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAddedAtMap((prev) => {
       const now = Date.now();
       const next: Record<string, number> = {};
@@ -103,11 +102,77 @@ export default function ActiveTrade({
   }, [waitingTrades, initializedSymbols]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
   const safeActiveTrades = mounted ? activeTrades : [];
   const safeWaitingTrades = mounted ? waitingTrades : [];
+
+  // AI regime badge — shared by waiting and active trades (only when symbol AI is enabled)
+  const renderAiRegimeBadge = (symbol: string, marginLeft = 6) => {
+    if (!aiGuardActive || !aiSymbolEnabled[symbol]) return null;
+    const r = aiRegime[symbol];
+    if (!r) return <span style={{ marginLeft, background: "#6b7280", color: "#fff", fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4 }}>ANALYZING</span>;
+    const ru = r.regime.toUpperCase();
+    if (ru === "UNKNOWN") return <span style={{ marginLeft, background: "#f59e0b", color: "#fff", fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4 }}>ERROR</span>;
+    let label = "SIDEWAYS", color = "#a855f7";
+    if (ru.includes("TREND") || ru.includes("UP") || ru.includes("BULL")) { label = "TRENDING"; color = "#22c55e"; }
+    else if (ru.includes("REVERS") || ru.includes("DOWN") || ru.includes("BEAR")) { label = "DOWNWARD"; color = "#ef4444"; }
+    return <span style={{ marginLeft, background: color, color: "#fff", fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4 }}>{label}</span>;
+  };
+
+  // AI toggle switch — small inline toggle for per-symbol AI Guard
+  const renderAiToggle = (symbol: string) => {
+    if (!aiGuardActive) return null;
+    const enabled = !!aiSymbolEnabled[symbol];
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          fetch(`${BASE_PATH}/api/ai/symbol-toggle`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ symbol, enabled: !enabled }),
+          }).catch(() => {});
+        }}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "4px",
+          cursor: "pointer",
+          border: "none",
+          background: "transparent",
+          padding: 0,
+          fontSize: 10,
+          fontWeight: 600,
+          color: enabled ? "var(--theme-popup-border)" : "#6b7280",
+        }}
+        aria-label={enabled ? "AI Guard ON — click to disable" : "AI Guard OFF — click to enable"}
+      >
+        <span style={{
+          position: "relative",
+          width: 24,
+          height: 14,
+          borderRadius: 7,
+          background: enabled ? "var(--theme-popup-border)" : "#374151",
+          transition: "background 0.15s",
+        }}>
+          <span style={{
+            position: "absolute",
+            top: 2,
+            left: enabled ? 12 : 2,
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            background: "#fff",
+            transition: "left 0.15s",
+          }} />
+        </span>
+        AI
+      </button>
+    );
+  };
 
   return (
     <Card className="w-full">
@@ -138,9 +203,16 @@ export default function ActiveTrade({
           {safeActiveTrades.map((t) => (
             <div key={t.symbol} className={styles.trade}>
               <div className={styles.tradeRow}>
-                <div className={styles.tradeSymbol}>{t.symbol}</div>
+                <div className={styles.tradeSymbol}>
+                  {t.symbol}
+                  {renderAiRegimeBadge(t.symbol)}
+                </div>
+              </div>
 
-                <div className={styles.tradeRight}>
+              {/* Price + Exit row — toggle absolutely positioned left, price/exit right-aligned */}
+              <div style={{ display: "flex", justifyContent: aiGuardActive ? "space-between" : "flex-end", alignItems: "center", marginTop: "2px", marginBottom: "4px" }}>
+                {renderAiToggle(t.symbol)}
+                <div className={styles.tradeRight} style={!aiGuardActive ? { position: "relative", marginBottom: -32, bottom: 32 } : undefined}>
                   {(() => {
                     const ltp = activeLtps[t.symbol];
                     const entry = Number(t.entryPrice);
@@ -209,6 +281,78 @@ export default function ActiveTrade({
                   )}
                 </div>
               </div>
+
+              {/* AI Guard — Exit suggestion panel */}
+              {(() => {
+                const suggestion = aiSuggestions.find(
+                  (s) => s.symbol === t.symbol && s.type === "EXIT_SUGGESTED" && !s.dismissed
+                );
+                if (!suggestion) return null;
+                return (
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    background: "rgba(245,158,11,0.08)",
+                    border: "1px solid rgba(245,158,11,0.25)",
+                    marginBottom: "6px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                      <AlertTriangle className="w-4 h-4" style={{ color: "#f59e0b", flexShrink: 0, marginTop: "1px" }} />
+                      <div style={{ flex: 1, fontSize: "12px", lineHeight: "16px" }}>
+                        <span style={{ fontWeight: 600, color: "#f59e0b" }}>AI suggests EXIT</span>
+                        <span style={{ color: "var(--theme-text-gray-500)", marginLeft: "6px" }}>— {suggestion.reason} ({suggestion.confidence}%)</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", marginLeft: "26px" }}>
+                      <button
+                        className={`${styles.waitingBtn} ${styles.dark}`}
+                        type="button"
+                        style={{ padding: "2px 8px", fontSize: "11px" }}
+                        onClick={() => {
+                          const ltp = activeLtps[t.symbol];
+                          const entry = Number(t.entryPrice);
+                          const qty = t.lotSize * t.lotValue;
+                          const unrealized =
+                            t.inPosition && Number.isFinite(ltp) && Number.isFinite(entry)
+                              ? (ltp - entry) * qty
+                              : 0;
+                          const livePnl = t.pnl + unrealized;
+                          const now = new Date();
+                          const hh = String(now.getHours()).padStart(2, "0");
+                          const mm = String(now.getMinutes()).padStart(2, "0");
+                          const ss = String(now.getSeconds()).padStart(2, "0");
+                          const lastCandleTime = `${hh}:${mm}:${ss}`;
+                          fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/exit`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ exitPrice: String(ltp ?? ""), lastCandleTime }),
+                          }).catch(() => {});
+                          onManualExit(t.symbol, String(ltp ?? ""), livePnl, lastCandleTime);
+                        }}
+                      >
+                        Exit Now
+                      </button>
+                      <button
+                        className={`${styles.waitingBtn} ${styles.danger}`}
+                        type="button"
+                        style={{ padding: "2px 8px", fontSize: "11px" }}
+                        onClick={() => {
+                          fetch(`${BASE_PATH}/api/ai/dismiss`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ symbol: t.symbol }),
+                          }).catch(() => {});
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {t.logs.length > 0 && <TradeLogsConsole logs={t.logs} />}
 
@@ -305,7 +449,11 @@ export default function ActiveTrade({
               .map((t: WaitingTrade, index: number) => (
               <div key={index} className={styles.trade}>
                 <div className={styles.tradeRow}>
-                  <div className={styles.tradeSymbol}>{t.symbol}</div>
+                  <div className={styles.tradeSymbol}>
+                    {t.symbol}
+                    {renderAiRegimeBadge(t.symbol)}
+                  </div>
+                  {renderAiToggle(t.symbol)}
                 </div>
 
                 <div className={styles.waitingActions}>
@@ -346,6 +494,68 @@ export default function ActiveTrade({
                     Cancel
                   </button>
                 </div>
+
+                {/* AI Guard — Entry blocked panel */}
+                {(() => {
+                  const suggestion = aiSuggestions.find(
+                    (s) => s.symbol === t.symbol && s.type === "ENTRY_BLOCKED" && !s.dismissed
+                  );
+                  if (!suggestion) return null;
+                  return (
+                    <div style={{
+                      position: "relative",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "6px",
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      background: "rgba(239,68,68,0.08)",
+                      border: "1px solid rgba(239,68,68,0.25)",
+                      marginBottom: "6px",
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          fetch(`${BASE_PATH}/api/ai/dismiss`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ symbol: t.symbol }),
+                          }).catch(() => {});
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: "-10px",
+                          right: "-10px",
+                          width: "20px",
+                          height: "20px",
+                          borderRadius: "50%",
+                          border: "1px solid rgba(239,68,68,0.3)",
+                          background: "#ef4444",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          padding: 0,
+                          lineHeight: 1,
+                          fontSize: "14px",
+                          fontWeight: 700,
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                        }}
+                        aria-label="Dismiss"
+                      >
+                        ×
+                      </button>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                        <AlertTriangle className="w-4 h-4" style={{ color: "#ef4444", flexShrink: 0, marginTop: "1px" }} />
+                        <div style={{ flex: 1, fontSize: "12px", lineHeight: "16px" }}>
+                          <span style={{ fontWeight: 600, color: "#ef4444" }}>AI blocked entry</span>
+                          <span style={{ color: "var(--theme-text-gray-500)", marginLeft: "6px" }}>— {suggestion.reason} ({suggestion.confidence}%)</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Trade Configuration for Waiting Trades */}
                 <div className={styles.tradeConfig}>
