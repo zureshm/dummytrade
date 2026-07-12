@@ -17,6 +17,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldEnabled: true,
     minToHold: 8,
     minToHoldTrigger: 2,
+    minToHoldTrailing: false,
     trailingAfterTargetEnabled: true,
     trailingAfterTarget: 10,
     trailingMode: "live",
@@ -32,6 +33,12 @@ export const STRATEGY_DEFAULTS = {
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
     reEntryPoints: 3,
+    reEntryAsTrailingEnabled: true,
+    reEntryTrailingPoints: 10,
+    reEntryMinTargetEnabled: false,
+    reEntryMinTargetPoints: 8,
+    reEntryMinTargetTrigger: 2,
+    reEntryMinTargetTrailing: false,
     signalReEntryEnabled: true
   },
   allclear: {
@@ -52,6 +59,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldEnabled: false,
     minToHold: 5,
     minToHoldTrigger: 2,
+    minToHoldTrailing: false,
     trailingAfterTargetEnabled: false,
     trailingAfterTarget: 10,
     trailingMode: "live",
@@ -67,6 +75,12 @@ export const STRATEGY_DEFAULTS = {
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
     reEntryPoints: 3,
+    reEntryAsTrailingEnabled: true,
+    reEntryTrailingPoints: 10,
+    reEntryMinTargetEnabled: false,
+    reEntryMinTargetPoints: 8,
+    reEntryMinTargetTrigger: 2,
+    reEntryMinTargetTrailing: false,
     signalReEntryEnabled: true
   },
   low: {
@@ -87,6 +101,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldEnabled: true,
     minToHold: 4,
     minToHoldTrigger: 1.5,
+    minToHoldTrailing: false,
     trailingAfterTargetEnabled: true,
     trailingAfterTarget: 5,
     trailingMode: "live",
@@ -102,6 +117,12 @@ export const STRATEGY_DEFAULTS = {
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
     reEntryPoints: 3,
+    reEntryAsTrailingEnabled: true,
+    reEntryTrailingPoints: 5,
+    reEntryMinTargetEnabled: false,
+    reEntryMinTargetPoints: 8,
+    reEntryMinTargetTrigger: 2,
+    reEntryMinTargetTrailing: false,
     signalReEntryEnabled: true
   },
   medium: {
@@ -122,6 +143,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldEnabled: true,
     minToHold: 2,
     minToHoldTrigger: 4,
+    minToHoldTrailing: false,
     trailingAfterTargetEnabled: true,
     trailingAfterTarget: 5,
     trailingMode: "live",
@@ -137,6 +159,12 @@ export const STRATEGY_DEFAULTS = {
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
     reEntryPoints: 3,
+    reEntryAsTrailingEnabled: true,
+    reEntryTrailingPoints: 5,
+    reEntryMinTargetEnabled: false,
+    reEntryMinTargetPoints: 8,
+    reEntryMinTargetTrigger: 2,
+    reEntryMinTargetTrailing: false,
     signalReEntryEnabled: true
   },
   high: {
@@ -157,6 +185,7 @@ export const STRATEGY_DEFAULTS = {
     minToHoldEnabled: true,
     minToHold: 6,
     minToHoldTrigger: 4,
+    minToHoldTrailing: false,
     trailingAfterTargetEnabled: true,
     trailingAfterTarget: 12,
     trailingMode: "live",
@@ -172,6 +201,12 @@ export const STRATEGY_DEFAULTS = {
     reEntryAfterTargetEnabled: false,
     reEntryCandles: 5,
     reEntryPoints: 3,
+    reEntryAsTrailingEnabled: true,
+    reEntryTrailingPoints: 12,
+    reEntryMinTargetEnabled: false,
+    reEntryMinTargetPoints: 8,
+    reEntryMinTargetTrigger: 2,
+    reEntryMinTargetTrailing: false,
     signalReEntryEnabled: true
   }
 };

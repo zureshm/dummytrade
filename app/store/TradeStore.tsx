@@ -23,6 +23,7 @@ export type WaitingTrade = {
   minToHoldEnabled: boolean;
   minToHold: number;
   minToHoldTrigger: number;
+  minToHoldTrailing: boolean;
   trailingAfterTargetEnabled: boolean;
   trailingAfterTarget: number;
   trailingMode: "live" | "candleClose";
@@ -42,6 +43,12 @@ export type WaitingTrade = {
   reEntryAfterTargetEnabled: boolean;
   reEntryCandles: number;
   reEntryPoints: number;
+  reEntryAsTrailingEnabled: boolean;
+  reEntryTrailingPoints: number;
+  reEntryMinTargetEnabled: boolean;
+  reEntryMinTargetPoints: number;
+  reEntryMinTargetTrigger: number;
+  reEntryMinTargetTrailing: boolean;
   pendingSkippedBuy?: boolean;
   signalReEntryEnabled: boolean;
 };
@@ -63,11 +70,14 @@ export type ActiveTrade = {
   minToHoldEnabled: boolean;
   minToHold: number;
   minToHoldTrigger: number;
+  minToHoldTrailing: boolean;
   trailingAfterTargetEnabled: boolean;
   trailingAfterTarget: number;
   trailingMode: "live" | "candleClose";
   trailingTrailActive: boolean;
   trailingHighWatermark?: number;
+  minTargetHighWatermark?: number;
+  minTargetLockedPrice?: number;
   rangeEnabled: boolean;
   timeFrom: string;
   timeFromAmpm: string;
@@ -91,12 +101,29 @@ export type ActiveTrade = {
   reEntryAfterTargetEnabled: boolean;
   reEntryCandles: number;
   reEntryPoints: number;
+  reEntryAsTrailingEnabled: boolean;
+  reEntryTrailingPoints: number;
+  reEntryMinTargetEnabled: boolean;
+  reEntryMinTargetPoints: number;
+  reEntryMinTargetTrigger: number;
+  reEntryMinTargetTrailing: boolean;
+  isReEntryCycle?: boolean;
   reEntryExitPrice?: number;
   reEntrySellTime?: string;
   reEntryReason?: string;
   pendingSkippedBuy?: boolean;
   signalReEntryEnabled: boolean;
   signalReEntryArmed?: boolean;
+};
+
+export type AiSuggestion = {
+  symbol: string;
+  type: "ENTRY_BLOCKED" | "EXIT_SUGGESTED";
+  marketRegime: string;
+  confidence: number;
+  reason: string;
+  timestamp: string;
+  dismissed: boolean;
 };
 
 export type TradeHistoryItem = {
@@ -207,7 +234,17 @@ type TradeStoreValue = {
     lastStrategyCandleTime: string;
     symbolsWithFirstSignal?: string[];
     symbolHistoryStatus?: Record<string, { status: string; candleCount: number }>;
+    aiSuggestions?: AiSuggestion[];
+    aiGuardActive?: boolean;
+    aiRegime?: Record<string, { regime: string; confidence: number }>;
+    aiSymbolEnabled?: Record<string, boolean>;
   }) => void;
+
+  // AI Guard
+  aiSuggestions: AiSuggestion[];
+  aiGuardActive: boolean;
+  aiRegime: Record<string, { regime: string; confidence: number }>;
+  aiSymbolEnabled: Record<string, boolean>;
 
   // symbols that have received at least one valid signal (loader tracking)
   initializedSymbols: Set<string>;
@@ -257,6 +294,10 @@ export function TradeStoreProvider({
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>([]);
   const [initializedSymbols, setInitializedSymbols] = useState<Set<string>>(new Set());
   const [symbolHistoryStatus, setSymbolHistoryStatus] = useState<Record<string, { status: string; candleCount: number }>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<AiSuggestion[]>([]);
+  const [aiGuardActive, setAiGuardActive] = useState(false);
+  const [aiRegime, setAiRegime] = useState<Record<string, { regime: string; confidence: number }>>({});
+  const [aiSymbolEnabled, setAiSymbolEnabled] = useState<Record<string, boolean>>({});
 
   // Track whether we've done the initial sync from server
   const initialSyncDone = useRef(false);
@@ -298,6 +339,7 @@ export function TradeStoreProvider({
         minToHoldEnabled: readFormBool(sym, "minToHoldEnabled", false),
         minToHold: readFormNumber(sym, "minToHold", 8),
         minToHoldTrigger: readFormNumber(sym, "minToHoldTrigger", 2),
+        minToHoldTrailing: readFormBool(sym, "minToHoldTrailing", false),
         trailingAfterTargetEnabled: readFormBool(sym, "trailingAfterTargetEnabled", false),
         trailingAfterTarget: readFormNumber(sym, "trailingAfterTarget", 15),
         trailingMode: readFormString(sym, "trailingMode", "live") as "live" | "candleClose",
@@ -328,6 +370,12 @@ export function TradeStoreProvider({
         reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
         reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
         reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
+        reEntryAsTrailingEnabled: readFormBool(sym, "reEntryAsTrailingEnabled", true),
+        reEntryTrailingPoints: readFormNumber(sym, "reEntryTrailingPoints", 10),
+        reEntryMinTargetEnabled: readFormBool(sym, "reEntryMinTargetEnabled", false),
+        reEntryMinTargetPoints: readFormNumber(sym, "reEntryMinTargetPoints", 8),
+        reEntryMinTargetTrigger: readFormNumber(sym, "reEntryMinTargetTrigger", 2),
+        reEntryMinTargetTrailing: readFormBool(sym, "reEntryMinTargetTrailing", false),
         pendingSkippedBuy: false,
         signalReEntryEnabled: readFormBool(sym, "signalReEntryEnabled", true),
       },
@@ -379,11 +427,14 @@ export function TradeStoreProvider({
       minToHoldEnabled: tradeToActivate.minToHoldEnabled,
       minToHold: tradeToActivate.minToHold,
       minToHoldTrigger: tradeToActivate.minToHoldTrigger,
+      minToHoldTrailing: tradeToActivate.minToHoldTrailing,
       trailingAfterTargetEnabled: tradeToActivate.trailingAfterTargetEnabled,
       trailingAfterTarget: tradeToActivate.trailingAfterTarget,
       trailingMode: tradeToActivate.trailingMode,
       trailingTrailActive: false,
       trailingHighWatermark: undefined,
+      minTargetHighWatermark: undefined,
+      minTargetLockedPrice: undefined,
       rangeEnabled: tradeToActivate.rangeEnabled,
       timeFrom: tradeToActivate.timeFrom,
       timeFromAmpm: tradeToActivate.timeFromAmpm,
@@ -407,6 +458,13 @@ export function TradeStoreProvider({
       reEntryAfterTargetEnabled: tradeToActivate.reEntryAfterTargetEnabled,
       reEntryCandles: tradeToActivate.reEntryCandles,
       reEntryPoints: tradeToActivate.reEntryPoints,
+      reEntryAsTrailingEnabled: tradeToActivate.reEntryAsTrailingEnabled,
+      reEntryTrailingPoints: tradeToActivate.reEntryTrailingPoints,
+      reEntryMinTargetEnabled: tradeToActivate.reEntryMinTargetEnabled,
+      reEntryMinTargetPoints: tradeToActivate.reEntryMinTargetPoints,
+      reEntryMinTargetTrigger: tradeToActivate.reEntryMinTargetTrigger,
+      reEntryMinTargetTrailing: tradeToActivate.reEntryMinTargetTrailing,
+      isReEntryCycle: false,
       pendingSkippedBuy: false,
       signalReEntryEnabled: tradeToActivate.signalReEntryEnabled,
       signalReEntryArmed: false,
@@ -734,6 +792,10 @@ export function TradeStoreProvider({
     lastStrategyCandleTime: string;
     symbolsWithFirstSignal?: string[];
     symbolHistoryStatus?: Record<string, { status: string; candleCount: number }>;
+    aiSuggestions?: AiSuggestion[];
+    aiGuardActive?: boolean;
+    aiRegime?: Record<string, { regime: string; confidence: number }>;
+    aiSymbolEnabled?: Record<string, boolean>;
   }) => {
     // On first sync (page load/refresh), populate waitingTrades from server.
     // After that, waitingTrades is frontend-owned — only remove trades that
@@ -782,6 +844,18 @@ export function TradeStoreProvider({
     if (state.symbolHistoryStatus) {
       setSymbolHistoryStatus(state.symbolHistoryStatus);
     }
+    if (Array.isArray(state.aiSuggestions)) {
+      setAiSuggestions(state.aiSuggestions);
+    }
+    if (typeof state.aiGuardActive === "boolean") {
+      setAiGuardActive(state.aiGuardActive);
+    }
+    if (state.aiRegime) {
+      setAiRegime(state.aiRegime);
+    }
+    if (state.aiSymbolEnabled) {
+      setAiSymbolEnabled(state.aiSymbolEnabled);
+    }
   }, []);
 
   const value: TradeStoreValue = {
@@ -814,6 +888,10 @@ export function TradeStoreProvider({
     getLastStrategyCandleTime,
     setLastStrategyCandleTime,
     syncFromServer,
+    aiSuggestions,
+    aiGuardActive,
+    aiRegime,
+    aiSymbolEnabled,
   };
 
   return (
