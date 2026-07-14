@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Activity, Zap, XCircle, Loader2, AlertTriangle } from "lucide-react";
+import { Activity, Zap, XCircle, Loader2, AlertTriangle, SkipForward } from "lucide-react";
 import styles from "./ActiveTrade.module.scss";
 import type { ActiveTrade as ActiveTradeType, WaitingTrade } from "../store/TradeStore";
 import { useTradeStore } from "../store/TradeStore";
@@ -354,7 +354,69 @@ export default function ActiveTrade({
                 );
               })()}
 
-              {t.logs.length > 0 && <TradeLogsConsole logs={t.logs} />}
+              {t.logs.length > 0 && (
+                <div style={{ position: "relative" }}>
+                  <TradeLogsConsole logs={t.logs} />
+                  {forceBuyEnabled && t.status === "ACTIVE" && (
+                    <>
+                      {!t.inPosition && (
+                        <button
+                          type="button"
+                          title="Force Buy"
+                          onClick={() => {
+                            fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-buy-active`, { method: "POST" }).catch(() => {});
+                          }}
+                          style={{
+                            position: "absolute",
+                            bottom: 6,
+                            right: 26,
+                            width: 32,
+                            height: 32,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 6,
+                            border: "1px solid rgba(34,197,94,0.4)",
+                            background: "rgba(34,197,94,0.15)",
+                            color: "#22c55e",
+                            cursor: "pointer",
+                            zIndex: 1,
+                          }}
+                        >
+                          <Zap className="w-4 h-4" />
+                        </button>
+                      )}
+                      {t.inPosition && (
+                        <button
+                          type="button"
+                          title="End Cycle"
+                          onClick={() => {
+                            fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/end-cycle`, { method: "POST" }).catch(() => {});
+                          }}
+                          style={{
+                            position: "absolute",
+                            bottom: 6,
+                            right: 26,
+                            width: 32,
+                            height: 32,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 6,
+                            border: "1px solid rgba(245,158,11,0.4)",
+                            background: "rgba(245,158,11,0.15)",
+                            color: "#f59e0b",
+                            cursor: "pointer",
+                            zIndex: 1,
+                          }}
+                        >
+                          <SkipForward className="w-4 h-4" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Trade Configuration */}
               <div className={styles.tradeConfig}>

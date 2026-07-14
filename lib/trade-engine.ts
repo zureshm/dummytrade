@@ -4204,6 +4204,56 @@ export async function forceBuyWaitingTrade(symbol: string) {
 
 }
 
+export async function forceBuyActiveTrade(symbol: string) {
+  const trade = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE" && !t.inPosition);
+  if (!trade) return;
+
+  let entryPrice = "0";
+  try {
+    const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(symbol)}`);
+    const prices = await res.json();
+    if (Array.isArray(prices) && prices.length > 0 && prices[0]?.ltp) {
+      entryPrice = String(prices[0].ltp);
+    }
+  } catch { /* fallback to 0 */ }
+
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const timeStr = `${hh}:${mm}:${ss}`;
+  const logLine = `FORCE BUY triggered for ₹${entryPrice} at ${timeStr}`;
+
+  updateActiveTradeBuy(symbol, entryPrice, logLine);
+  delete pendingBuyBuffer[symbol];
+  setPendingSkippedBuy(symbol, false);
+  persistState();
+}
+
+export async function manualEndCycle(symbol: string) {
+  const trade = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE" && t.inPosition);
+  if (!trade) return;
+
+  let exitPrice = "0";
+  try {
+    const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(symbol)}`);
+    const prices = await res.json();
+    if (Array.isArray(prices) && prices.length > 0 && prices[0]?.ltp) {
+      exitPrice = String(prices[0].ltp);
+    }
+  } catch { /* fallback to 0 */ }
+
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const timeStr = `${hh}:${mm}:${ss}`;
+  const logLine = `MANUAL END CYCLE — SELL for ₹${exitPrice} at ${timeStr}`;
+
+  completeCycleWithoutExit(symbol, exitPrice, logLine);
+  persistState();
+}
+
 
 
 export function cancelWaitingTrade(symbol: string) {
