@@ -74,6 +74,9 @@ export default function ActiveTrade({
   const [mounted, setMounted] = useState(false);
   const { removeTradeAndFreeSymbol, forceBuyEnabled, initializedSymbols, symbolHistoryStatus, aiSuggestions, aiGuardActive, aiRegime, aiSymbolEnabled } = useTradeStore();
 
+  // Track pending force-buy / end-cycle requests per symbol
+  const [pendingAction, setPendingAction] = useState<Record<string, "force-buy" | "end-cycle">>({});
+
   // Track when each waiting symbol was first seen — for 30s loader timeout
   // Stored in state (not ref) so it is safe to read during render.
   const [addedAtMap, setAddedAtMap] = useState<Record<string, number>>({});
@@ -357,14 +360,41 @@ export default function ActiveTrade({
               {t.logs.length > 0 && (
                 <div style={{ position: "relative" }}>
                   <TradeLogsConsole logs={t.logs} />
-                  {forceBuyEnabled && t.status === "ACTIVE" && (
-                    <>
-                      {!t.inPosition && (
+                  {forceBuyEnabled && t.status === "ACTIVE" && (() => {
+                    const pending = pendingAction[t.symbol];
+                    if (pending) {
+                      return (
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: 6,
+                            right: 26,
+                            width: 32,
+                            height: 32,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 6,
+                            border: "1px solid rgba(99,102,241,0.4)",
+                            background: "rgba(99,102,241,0.15)",
+                            color: "#6366f1",
+                            zIndex: 1,
+                          }}
+                        >
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        </div>
+                      );
+                    }
+                    if (!t.inPosition) {
+                      return (
                         <button
                           type="button"
                           title="Force Buy"
                           onClick={() => {
-                            fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-buy-active`, { method: "POST" }).catch(() => {});
+                            setPendingAction((prev) => ({ ...prev, [t.symbol]: "force-buy" }));
+                            fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-buy-active`, { method: "POST" })
+                              .catch(() => {})
+                              .finally(() => setPendingAction((prev) => { const next = { ...prev }; delete next[t.symbol]; return next; }));
                           }}
                           style={{
                             position: "absolute",
@@ -385,36 +415,39 @@ export default function ActiveTrade({
                         >
                           <Zap className="w-4 h-4" />
                         </button>
-                      )}
-                      {t.inPosition && (
-                        <button
-                          type="button"
-                          title="End Cycle"
-                          onClick={() => {
-                            fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/end-cycle`, { method: "POST" }).catch(() => {});
-                          }}
-                          style={{
-                            position: "absolute",
-                            bottom: 6,
-                            right: 26,
-                            width: 32,
+                      );
+                    }
+                    return (
+                      <button
+                        type="button"
+                        title="End Cycle"
+                        onClick={() => {
+                          setPendingAction((prev) => ({ ...prev, [t.symbol]: "end-cycle" }));
+                          fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/end-cycle`, { method: "POST" })
+                            .catch(() => {})
+                            .finally(() => setPendingAction((prev) => { const next = { ...prev }; delete next[t.symbol]; return next; }));
+                        }}
+                        style={{
+                          position: "absolute",
+                          bottom: 6,
+                          right: 26,
+                          width: 32,
                             height: 32,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: 6,
-                            border: "1px solid rgba(245,158,11,0.4)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: 6,
+                          border: "1px solid rgba(245,158,11,0.4)",
                             background: "rgba(245,158,11,0.15)",
-                            color: "#f59e0b",
-                            cursor: "pointer",
-                            zIndex: 1,
-                          }}
-                        >
-                          <SkipForward className="w-4 h-4" />
-                        </button>
-                      )}
-                    </>
-                  )}
+                          color: "#f59e0b",
+                          cursor: "pointer",
+                          zIndex: 1,
+                        }}
+                      >
+                        <SkipForward className="w-4 h-4" />
+                      </button>
+                    );
+                  })()}
                 </div>
               )}
 
