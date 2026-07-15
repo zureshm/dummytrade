@@ -406,10 +406,10 @@ export default function TradePage() {
                   </button>
                   {isCandleSizeInfoOpen && (
                     <div
-                      className="absolute left-0 top-7 w-64 rounded-md p-2 text-white shadow-lg"
-                      style={{ zIndex: 9, background: "rgba(0,0,0,0.8)", fontSize: "11px", lineHeight: "18px" }}
+                      className="absolute right-0 top-7 w-56 rounded-md p-3 text-white shadow-lg"
+                      style={{ zIndex: 9999, background: "rgba(0,0,0,0.9)", fontSize: "11px", lineHeight: "16px", maxHeight: "200px", overflowY: "auto" }}
                     >
-                      When a BUY signal is skipped because the candle is too large, the trade remembers this. If the next signal before any other BUY is a REENTER from the strategy, it will enter at that point as if a BUY occurred.
+                      When a BUY signal is skipped because the candle is too large, the trade remembers this. If the next signal before any other BUY is a REENTER from the strategy, it will enter at that point as if a BUY had occurred.
                     </div>
                   )}
                 </div>
@@ -777,7 +777,7 @@ export default function TradePage() {
                         className="absolute right-0 mt-2 w-64 rounded-md p-2 text-white shadow-lg"
                         style={{ zIndex: 9, background: "rgba(0,0,0,0.8)", fontSize: "11px", lineHeight: "18px" }}
                       >
-                        After any exit (Target, Trailing SL, Stop-loss, or Minimum Target), if the strategy sends a REENTER signal, the trade will re-enter only if the current price is higher than the last exit price. Applies configured guards (candle size, time range, wait-after-sell) if they are enabled.
+                        After any exit (Target, Trailing SL, Stop-loss, or Minimum Target), if the strategy sends a REENTER signal, the trade will re-enter only if the current price is higher than the last exit price. Applies configured guards (candle size, time range, wait-after-sell) if they are enabled. If the strategy sends a REEXIT signal while in a re-entry position, the trade will exit that cycle immediately.
                       </div>
                     )}
                   </div>
