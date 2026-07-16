@@ -2843,6 +2843,8 @@ function handleStrategySignal(signal: any) {
 
     if (!activeForSymbol || !activeForSymbol.inPosition) return;
 
+    if (!activeForSymbol.isReEntryCycle) return;
+
     setPendingSkippedBuy(signalSymbol, false);
 
     completeActiveTrade(activeForSymbol.symbol, String(latestClose ?? ""), "REEXIT triggered for ₹" + String(latestClose ?? "") + " at " + fmtTime(signal.lastCandleTime));
