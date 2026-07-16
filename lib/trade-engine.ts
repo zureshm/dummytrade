@@ -668,7 +668,7 @@ interface PendingBuyBuffer {
   originalSignal: any;
 }
 const pendingBuyBuffer: Record<string, PendingBuyBuffer> = {};
-const AI_BUFFER_MAX_CANDLES = 2;
+const AI_BUFFER_MAX_CANDLES = 1;
 
 
 
