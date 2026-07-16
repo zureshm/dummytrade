@@ -664,15 +664,18 @@ export default function SettingsPopup({ open, onClose }: Props) {
                         )}
                       </div>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         min="30"
                         max="120"
                         step="30"
-                        value={aiCandlesCount}
+                        value={aiCandlesCount || ""}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
+                          const val = parseInt(e.target.value.replace(/\D/g, "") || "0", 10);
                           if (!isNaN(val)) setAiCandlesCount(Math.min(120, Math.max(30, val)));
                         }}
+                        onBlur={(e) => { if (!e.target.value) setAiCandlesCount(30); }}
                         className="w-16 h-7 px-2 rounded-lg text-xs text-center"
                         style={{
                           background: "var(--theme-popup-field-bg)",
@@ -690,15 +693,18 @@ export default function SettingsPopup({ open, onClose }: Props) {
                         <label className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>Recent Candles Weight</label>
                       </div>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         min="10"
                         max="60"
                         step="5"
-                        value={aiRecentCandlesCount}
+                        value={aiRecentCandlesCount || ""}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
+                          const val = parseInt(e.target.value.replace(/\D/g, "") || "0", 10);
                           if (!isNaN(val)) setAiRecentCandlesCount(Math.min(60, Math.max(10, val)));
                         }}
+                        onBlur={(e) => { if (!e.target.value) setAiRecentCandlesCount(10); }}
                         className="w-16 h-7 px-2 rounded-lg text-xs text-center"
                         style={{
                           background: "var(--theme-popup-field-bg)",
