@@ -668,7 +668,7 @@ interface PendingBuyBuffer {
   originalSignal: any;
 }
 const pendingBuyBuffer: Record<string, PendingBuyBuffer> = {};
-const AI_BUFFER_MAX_CANDLES = 2;
+const AI_BUFFER_MAX_CANDLES = 1;
 
 
 
@@ -2831,6 +2831,38 @@ function handleStrategySignal(signal: any) {
 
 
 
+  // REEXIT signal — respects signal re-exit for trades entered via REENTER
+
+  if (signal.signal === "REEXIT") {
+
+    const signalKey = signal.signal + "-" + signal.lastCandleTime;
+
+    if (signalKey === lastHandledSignalKey[signalSymbol]) return;
+
+    if (waitingForBuy) return;
+
+    if (!activeForSymbol || !activeForSymbol.inPosition) return;
+
+    if (!activeForSymbol.isReEntryCycle) return;
+
+    setPendingSkippedBuy(signalSymbol, false);
+
+    completeActiveTrade(activeForSymbol.symbol, String(latestClose ?? ""), "REEXIT triggered for ₹" + String(latestClose ?? "") + " at " + fmtTime(signal.lastCandleTime));
+
+    updateLastSellCandleTime(activeForSymbol.symbol, signal.lastCandleTime);
+
+    lastHandledSignalKey[signalSymbol] = signalKey;
+
+    return;
+
+  }
+
+
+
+
+
+
+
   // WAIT signal
 
 
@@ -4202,6 +4234,56 @@ export async function forceBuyWaitingTrade(symbol: string) {
 
   persistState();
 
+}
+
+export async function forceBuyActiveTrade(symbol: string) {
+  const trade = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE" && !t.inPosition);
+  if (!trade) return;
+
+  let entryPrice = "0";
+  try {
+    const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(symbol)}`);
+    const prices = await res.json();
+    if (Array.isArray(prices) && prices.length > 0 && prices[0]?.ltp) {
+      entryPrice = String(prices[0].ltp);
+    }
+  } catch { /* fallback to 0 */ }
+
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const timeStr = `${hh}:${mm}:${ss}`;
+  const logLine = `FORCE BUY triggered for ₹${entryPrice} at ${timeStr}`;
+
+  updateActiveTradeBuy(symbol, entryPrice, logLine);
+  delete pendingBuyBuffer[symbol];
+  setPendingSkippedBuy(symbol, false);
+  persistState();
+}
+
+export async function manualEndCycle(symbol: string) {
+  const trade = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE" && t.inPosition);
+  if (!trade) return;
+
+  let exitPrice = "0";
+  try {
+    const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(symbol)}`);
+    const prices = await res.json();
+    if (Array.isArray(prices) && prices.length > 0 && prices[0]?.ltp) {
+      exitPrice = String(prices[0].ltp);
+    }
+  } catch { /* fallback to 0 */ }
+
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const timeStr = `${hh}:${mm}:${ss}`;
+  const logLine = `MANUAL END CYCLE — SELL for ₹${exitPrice} at ${timeStr}`;
+
+  completeCycleWithoutExit(symbol, exitPrice, logLine);
+  persistState();
 }
 
 
