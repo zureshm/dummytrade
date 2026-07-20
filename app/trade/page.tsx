@@ -15,8 +15,8 @@ import styles from "./page.module.scss";
 import { BASE_PATH } from "@/lib/basePath";
 
 function NumericInput({ value, onChange, onBlur, fallback = "0", ...props }: any) {
-  const [local, setLocal] = useState<string>(value ? String(value) : "");
-  useEffect(() => { setLocal(value ? String(value) : ""); }, [value]);
+  const [local, setLocal] = useState<string>(value != null ? String(value) : "");
+  useEffect(() => { setLocal(value != null ? String(value) : ""); }, [value]);
   return (
     <Input
       {...props}
@@ -38,8 +38,8 @@ function NumericInput({ value, onChange, onBlur, fallback = "0", ...props }: any
 }
 
 function NumericField({ value, onChange, onBlur, fallback = "0", ...props }: any) {
-  const [local, setLocal] = useState<string>(value ? String(value) : "");
-  useEffect(() => { setLocal(value ? String(value) : ""); }, [value]);
+  const [local, setLocal] = useState<string>(value != null ? String(value) : "");
+  useEffect(() => { setLocal(value != null ? String(value) : ""); }, [value]);
   return (
     <input
       {...props}
