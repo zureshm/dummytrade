@@ -319,70 +319,74 @@ export function TradeStoreProvider({
   const addWaitingTradeFromSelection = () => {
     if (!selection) return;
     const alreadyExists = waitingTrades.some((trade) => trade.symbol === selection.symbol);
-    if (alreadyExists) return;
 
     const sym = selection.symbol;
-    const newWaitingTrades = [
-      {
-        symbol: sym,
-        price: selection.price,
-        stateText: "...WAITING",
-        logs: ["Strategy initialized - waiting for signals"],
-        lotSize: readFormNumber(sym, "lotSize", sym.startsWith("SENSEX") ? 20 : 65),
-        lotValue: readFormNumber(sym, "lotValue", 1),
-        numberOfTrades: readFormNumber(sym, "numberOfTrades", 3),
-        stopLossNumberEnabled: readFormBool(sym, "stopLossNumberEnabled", true),
-        stopLossNumber: readFormNumber(sym, "stopLossNumber", 15),
-        targetPointsEnabled: readFormBool(sym, "targetPointsEnabled", true),
-        targetPoints: readFormNumber(sym, "targetPoints", 20),
-        targetMode: readFormString(sym, "targetMode", "live") as "live" | "candleClose",
-        minToHoldEnabled: readFormBool(sym, "minToHoldEnabled", false),
-        minToHold: readFormNumber(sym, "minToHold", 8),
-        minToHoldTrigger: readFormNumber(sym, "minToHoldTrigger", 2),
-        minToHoldTrailing: readFormBool(sym, "minToHoldTrailing", false),
-        trailingAfterTargetEnabled: readFormBool(sym, "trailingAfterTargetEnabled", false),
-        trailingAfterTarget: readFormNumber(sym, "trailingAfterTarget", 15),
-        trailingMode: readFormString(sym, "trailingMode", "live") as "live" | "candleClose",
-        rangeEnabled: readFormBool(sym, "rangeEnabled", false),
-        timeFrom: readFormString(sym, "timeFrom", "10:00"),
-        timeFromAmpm: readFormString(sym, "timeFromAmpm", "am"),
-        timeTo: readFormString(sym, "timeTo", "02:45"),
-        timeToAmpm: readFormString(sym, "timeToAmpm", "pm"),
-        buyOverride: (() => {
-          try {
-            const saved = localStorage.getItem("dummy_tradeForm_" + sym);
-            if (!saved) return undefined;
-            const data = JSON.parse(saved);
-            if (!data.waitStrategyEnabled) return undefined;
-            const v = Number(data.buyOverrideSize);
-            return Number.isFinite(v) && v > 0 ? v : undefined;
-          } catch {
-            return undefined;
-          }
-        })(),
-        waitAfterSellEnabled: readFormBool(sym, "waitAfterSellEnabled", true),
-        waitAfterSellCandles: readFormNumber(sym, "waitAfterSellCandles", 8),
-        sellWhenLossCandlesEnabled: readFormBool(sym, "sellWhenLossCandlesEnabled", false),
-        sellWhenLossCandles: readFormNumber(sym, "sellWhenLossCandles", 5),
-        maxProfitLossEnabled: readFormBool(sym, "maxProfitLossEnabled", false),
-        maxProfit: readFormNumber(sym, "maxProfit", 1100),
-        maxLoss: readFormNumber(sym, "maxLoss", 900),
-        reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
-        reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
-        reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
-        reEntryAsTrailingEnabled: readFormBool(sym, "reEntryAsTrailingEnabled", true),
-        reEntryTrailingPoints: readFormNumber(sym, "reEntryTrailingPoints", 10),
-        reEntryMinTargetEnabled: readFormBool(sym, "reEntryMinTargetEnabled", false),
-        reEntryMinTargetPoints: readFormNumber(sym, "reEntryMinTargetPoints", 8),
-        reEntryMinTargetTrigger: readFormNumber(sym, "reEntryMinTargetTrigger", 2),
-        reEntryMinTargetTrailing: readFormBool(sym, "reEntryMinTargetTrailing", false),
-        pendingSkippedBuy: false,
-        signalReEntryEnabled: readFormBool(sym, "signalReEntryEnabled", true),
-      },
-      ...waitingTrades,
-    ];
+    const newTrade = {
+      symbol: sym,
+      price: selection.price,
+      stateText: "...WAITING",
+      logs: ["Strategy initialized - waiting for signals"] as string[],
+      lotSize: readFormNumber(sym, "lotSize", sym.startsWith("SENSEX") ? 20 : 65),
+      lotValue: readFormNumber(sym, "lotValue", 1),
+      numberOfTrades: readFormNumber(sym, "numberOfTrades", 3),
+      stopLossNumberEnabled: readFormBool(sym, "stopLossNumberEnabled", true),
+      stopLossNumber: readFormNumber(sym, "stopLossNumber", 15),
+      targetPointsEnabled: readFormBool(sym, "targetPointsEnabled", true),
+      targetPoints: readFormNumber(sym, "targetPoints", 20),
+      targetMode: readFormString(sym, "targetMode", "live") as "live" | "candleClose",
+      minToHoldEnabled: readFormBool(sym, "minToHoldEnabled", false),
+      minToHold: readFormNumber(sym, "minToHold", 8),
+      minToHoldTrigger: readFormNumber(sym, "minToHoldTrigger", 2),
+      minToHoldTrailing: readFormBool(sym, "minToHoldTrailing", false),
+      trailingAfterTargetEnabled: readFormBool(sym, "trailingAfterTargetEnabled", false),
+      trailingAfterTarget: readFormNumber(sym, "trailingAfterTarget", 15),
+      trailingMode: readFormString(sym, "trailingMode", "live") as "live" | "candleClose",
+      rangeEnabled: readFormBool(sym, "rangeEnabled", false),
+      timeFrom: readFormString(sym, "timeFrom", "10:00"),
+      timeFromAmpm: readFormString(sym, "timeFromAmpm", "am"),
+      timeTo: readFormString(sym, "timeTo", "02:45"),
+      timeToAmpm: readFormString(sym, "timeToAmpm", "pm"),
+      buyOverride: (() => {
+        try {
+          const saved = localStorage.getItem("dummy_tradeForm_" + sym);
+          if (!saved) return undefined;
+          const data = JSON.parse(saved);
+          if (!data.waitStrategyEnabled) return undefined;
+          const v = Number(data.buyOverrideSize);
+          return Number.isFinite(v) && v > 0 ? v : undefined;
+        } catch {
+          return undefined;
+        }
+      })(),
+      waitAfterSellEnabled: readFormBool(sym, "waitAfterSellEnabled", true),
+      waitAfterSellCandles: readFormNumber(sym, "waitAfterSellCandles", 8),
+      sellWhenLossCandlesEnabled: readFormBool(sym, "sellWhenLossCandlesEnabled", false),
+      sellWhenLossCandles: readFormNumber(sym, "sellWhenLossCandles", 5),
+      maxProfitLossEnabled: readFormBool(sym, "maxProfitLossEnabled", false),
+      maxProfit: readFormNumber(sym, "maxProfit", 1100),
+      maxLoss: readFormNumber(sym, "maxLoss", 900),
+      reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
+      reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
+      reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
+      reEntryAsTrailingEnabled: readFormBool(sym, "reEntryAsTrailingEnabled", true),
+      reEntryTrailingPoints: readFormNumber(sym, "reEntryTrailingPoints", 10),
+      reEntryMinTargetEnabled: readFormBool(sym, "reEntryMinTargetEnabled", false),
+      reEntryMinTargetPoints: readFormNumber(sym, "reEntryMinTargetPoints", 8),
+      reEntryMinTargetTrigger: readFormNumber(sym, "reEntryMinTargetTrigger", 2),
+      reEntryMinTargetTrailing: readFormBool(sym, "reEntryMinTargetTrailing", false),
+      pendingSkippedBuy: false,
+      signalReEntryEnabled: readFormBool(sym, "signalReEntryEnabled", true),
+    };
 
-    setWaitingTrades(newWaitingTrades);
+    if (alreadyExists) {
+      // Update: replace trade config but preserve existing logs
+      setWaitingTrades((prev) =>
+        prev.map((t) => t.symbol === sym ? { ...newTrade, logs: t.logs } : t)
+      );
+    } else {
+      // New: prepend
+      setWaitingTrades([newTrade, ...waitingTrades]);
+    }
     setSelection(null);
   };
 

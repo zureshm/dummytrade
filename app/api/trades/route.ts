@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getEngineState, addWaitingTrade, ensureEngineRunning, flushSoundEvents } from "@/lib/trade-engine";
+import { getEngineState, addWaitingTrade, updateWaitingTrade, ensureEngineRunning, flushSoundEvents } from "@/lib/trade-engine";
 
 // GET /api/trades — returns current engine state for frontend to display
 export async function GET() {
@@ -24,6 +24,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid symbol" }, { status: 400 });
     }
     addWaitingTrade(body);
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+}
+
+// PUT /api/trades — update an existing waiting trade's config
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const updated = updateWaitingTrade(body);
+    if (!updated) {
+      return NextResponse.json({ error: "Waiting trade not found" }, { status: 404 });
+    }
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

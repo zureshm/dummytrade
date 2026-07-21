@@ -1097,9 +1097,9 @@ export default function TradePage() {
                       saveForm();
                       addWaitingTradeFromSelection();
 
-                      // POST to server-side trade engine so it picks up the trade
+                      // PUT to update existing waiting trade, POST to add new one
                     fetch(`${BASE_PATH}/api/trades`, {
-                      method: "POST",
+                      method: isAlreadyWaiting ? "PUT" : "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         symbol: selection.symbol,
