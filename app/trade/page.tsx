@@ -752,7 +752,7 @@ export default function TradePage() {
                           lineHeight: "18px",
                         }}
                       >
-                        After exiting with a profit (target, trailing SL, or minimum target), if the price trends back up and exceeds the exit price within the specified candles, a new buy is triggered. Does not apply for stop-loss or loss exits.
+                        After exiting with a profit (target, trailing SL, or minimum target), if the price trends back up and exceeds the exit price within the specified candles, a new buy is triggered — but only if Strategy sends TRENDING is true. If TRENDING is false or unavailable, re-entry is blocked. Does not apply for stop-loss or loss exits.
                       </div>
                     )}
                   </div>
@@ -1097,9 +1097,9 @@ export default function TradePage() {
                       saveForm();
                       addWaitingTradeFromSelection();
 
-                      // POST to server-side trade engine so it picks up the trade
+                      // PUT to update existing waiting trade, POST to add new one
                     fetch(`${BASE_PATH}/api/trades`, {
-                      method: "POST",
+                      method: isAlreadyWaiting ? "PUT" : "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         symbol: selection.symbol,
