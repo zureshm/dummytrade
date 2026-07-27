@@ -62,7 +62,7 @@ function NumericField({ value, onChange, onBlur, fallback = "0", ...props }: any
 
 export default function TradePage() {
   const router = useRouter();
-  const { selection, addWaitingTradeFromSelection, waitingTrades, activeTrades } = useTradeStore();
+  const { selection, addWaitingTradeFromSelection, waitingTrades, activeTrades, updateActiveTradeConfig } = useTradeStore();
   const [currentPrice, setCurrentPrice] = useState<string | null>(null);
   const [lotValue, setLotValue] = useState(1);
 
@@ -170,8 +170,7 @@ export default function TradePage() {
 
   const isAlreadyWaiting = selection && waitingTrades.some((trade: WaitingTrade) => trade.symbol === selection.symbol);
   const isAlreadyActive = selection && activeTrades.some((trade) => trade.symbol === selection.symbol && trade.status === "ACTIVE");
-  const buttonText = isAlreadyActive ? "TRADE RUNNING" : (isAlreadyWaiting ? "UPDATE" : "ENTER");
-  const isButtonDisabled = isAlreadyActive;
+  const buttonText = isAlreadyActive ? "OVERRIDE" : (isAlreadyWaiting ? "UPDATE" : "ENTER");
 
   const lotSize: number = selection?.symbol?.startsWith("SENSEX") ? 20 : 65;
 
@@ -350,7 +349,8 @@ export default function TradePage() {
               id="trades"
               value={numberOfTrades.toString()} 
               onChange={(e) => setNumberOfTrades(Number(e.target.value))}
-              className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={!!isAlreadyActive}
+              className={`w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${isAlreadyActive ? "opacity-50 cursor-not-allowed bg-gray-100" : ""}`}
             >
               {Array.from({ length: 10 }, (_, i) => (
                 <option key={i + 1} value={i + 1}>
@@ -584,6 +584,8 @@ export default function TradePage() {
                       checked={trailingAfterTargetEnabled}
                       onChange={(e) => setTrailingAfterTargetEnabled(e.target.checked)}
                       className="h-4 w-4"
+                      disabled={!!isAlreadyActive}
+                      style={isAlreadyActive ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
                     />
                     <label htmlFor="trailingAfterTargetEnabled" className="text-sm font-medium">
                       Trailing SL <span className="text-xs text-gray-500 font-normal">({priceMode === "candleClose" ? "Candle close" : "Live price"})</span>
@@ -1078,7 +1080,8 @@ export default function TradePage() {
                   value={lotValue}
                   onChange={setLotValue}
                   fallback="1"
-                  className="w-16 h-8 text-sm"
+                  className={`w-16 h-8 text-sm ${isAlreadyActive ? "opacity-50 cursor-not-allowed" : ""}`}
+                  disabled={!!isAlreadyActive}
                 />
               </div>
 
@@ -1090,8 +1093,58 @@ export default function TradePage() {
             <div className="flex space-x-3">
               <Button
                 onClick={() => {
-                  if (!isButtonDisabled && selection?.symbol) {
-                      // Tell angel-feed backend which symbol is now the active live symbol
+                  if (selection?.symbol) {
+                    if (isAlreadyActive) {
+                      // OVERRIDE: update config of running trade (safe fields only)
+                      const configPayload = {
+                        stopLossNumberEnabled: stopLossNumberEnabled || stopLossPercentageEnabled,
+                        stopLossNumber,
+                        targetPointsEnabled,
+                        targetPoints,
+                        targetMode,
+                        minToHoldEnabled,
+                        minToHold,
+                        minToHoldTrigger,
+                        trailingAfterTargetEnabled,
+                        trailingAfterTarget,
+                        trailingMode,
+                        rangeEnabled,
+                        timeFrom,
+                        timeFromAmpm,
+                        timeTo,
+                        timeToAmpm,
+                        buyOverride: waitStrategyEnabled ? (buyOverrideSize || undefined) : undefined,
+                        waitAfterSellEnabled,
+                        waitAfterSellCandles,
+                        sellWhenLossCandlesEnabled,
+                        sellWhenLossCandles,
+                        maxProfitLossEnabled,
+                        maxProfit,
+                        maxLoss,
+                        reEntryAfterTargetEnabled,
+                        reEntryCandles,
+                        reEntryPoints,
+                        reEntryAsTrailingEnabled,
+                        reEntryTrailingPoints,
+                        reEntryMinTargetEnabled,
+                        reEntryMinTargetPoints,
+                        reEntryMinTargetTrigger,
+                        reEntryMinTargetTrailing: reEntryMinTargetTrailing === "yes",
+                        minToHoldTrailing: minToHoldTrailing === "yes",
+                        signalReEntryEnabled,
+                      };
+                      fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(selection.symbol)}/config`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(configPayload),
+                      }).catch(() => {});
+                      updateActiveTradeConfig(selection.symbol, configPayload);
+                      router.push("/dashboard");
+                      return;
+                    }
+
+                    // ENTER or UPDATE: add/update waiting trade
+                    // Tell angel-feed backend which symbol is now the active live symbol
                       setActiveSymbol(selection.symbol).catch(() => {});
 
                       saveForm();
@@ -1151,7 +1204,7 @@ export default function TradePage() {
                   }
                 }}
                 className="flex-1"
-                disabled={isButtonDisabled || false}
+                disabled={false}
               >
                 {buttonText}
               </Button>
