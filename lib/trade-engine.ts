@@ -755,7 +755,8 @@ const triggeredPositions = new Set<string>();
 
 const trailingArmedPositions = new Set<string>();
 
-
+// Throttle RE-ENTRY blocked logs to once per candle (not every 1s tick)
+const lastReEntryBlockedCandle: Record<string, string> = {};
 
 const lastCandleCloseMap: Record<string, number> = {};
 
@@ -767,8 +768,11 @@ const lastTrending: Record<string, boolean> = {};
 
 // Grace period after BUY: use only real-time LTP (not stale candle low/high) for SL/Target checks
 const lastBuyTimestamp: Record<string, number> = {};
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _BUY_GRACE_PERIOD_MS = 5000;
+const BUY_GRACE_PERIOD_MS = 5000;
+
+// Track the candle time at which the last BUY happened — prevents strategy exit signals
+// (SELL/STOPLOSS/TARGET/REEXIT) from firing on the same candle as entry
+const lastBuyCandleTime: Record<string, string> = {};
 
 // Grace period after minimum-target arming: ignore stale candle data for trigger check
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1568,6 +1572,9 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
   // Mark buy timestamp — during grace period, LTP monitoring ignores stale candle low/high
   lastBuyTimestamp[symbol] = Date.now();
 
+  // Track the candle time of this BUY so strategy exit signals on the same candle are blocked
+  lastBuyCandleTime[symbol] = lastStrategyCandleTime;
+
 }
 
 
@@ -2211,6 +2218,9 @@ function updateActiveTradeBuy(symbol: string, entryPrice: string, logLine: strin
   // Mark buy timestamp — during grace period, LTP monitoring ignores stale candle low/high
   lastBuyTimestamp[symbol] = Date.now();
 
+  // Track the candle time of this BUY so strategy exit signals on the same candle are blocked
+  lastBuyCandleTime[symbol] = lastStrategyCandleTime;
+
 }
 
 
@@ -2728,6 +2738,10 @@ function handleStrategySignal(signal: any) {
 
     if (!activeForSymbol || !activeForSymbol.inPosition) return;
 
+    // Block strategy exit signals on the same candle as entry or within 5s grace period
+    if (lastBuyCandleTime[signalSymbol] && signal.lastCandleTime === lastBuyCandleTime[signalSymbol]) return;
+    if (lastBuyTimestamp[signalSymbol] && (Date.now() - lastBuyTimestamp[signalSymbol]) < BUY_GRACE_PERIOD_MS) return;
+
     setPendingSkippedBuy(signalSymbol, false);
 
 
@@ -2769,6 +2783,10 @@ function handleStrategySignal(signal: any) {
 
 
     if (!activeForSymbol || !activeForSymbol.inPosition) return;
+
+    // Block strategy exit signals on the same candle as entry or within 5s grace period
+    if (lastBuyCandleTime[signalSymbol] && signal.lastCandleTime === lastBuyCandleTime[signalSymbol]) return;
+    if (lastBuyTimestamp[signalSymbol] && (Date.now() - lastBuyTimestamp[signalSymbol]) < BUY_GRACE_PERIOD_MS) return;
 
 
 
@@ -2830,6 +2848,10 @@ function handleStrategySignal(signal: any) {
 
     if (!activeForSymbol || !activeForSymbol.inPosition) return;
 
+    // Block strategy exit signals on the same candle as entry or within 5s grace period
+    if (lastBuyCandleTime[signalSymbol] && signal.lastCandleTime === lastBuyCandleTime[signalSymbol]) return;
+    if (lastBuyTimestamp[signalSymbol] && (Date.now() - lastBuyTimestamp[signalSymbol]) < BUY_GRACE_PERIOD_MS) return;
+
     setPendingSkippedBuy(signalSymbol, false);
 
 
@@ -2871,6 +2893,10 @@ function handleStrategySignal(signal: any) {
     if (!activeForSymbol || !activeForSymbol.inPosition) return;
 
     if (!activeForSymbol.isReEntryCycle) return;
+
+    // Block strategy exit signals on the same candle as entry or within 5s grace period
+    if (lastBuyCandleTime[signalSymbol] && signal.lastCandleTime === lastBuyCandleTime[signalSymbol]) return;
+    if (lastBuyTimestamp[signalSymbol] && (Date.now() - lastBuyTimestamp[signalSymbol]) < BUY_GRACE_PERIOD_MS) return;
 
     setPendingSkippedBuy(signalSymbol, false);
 
@@ -3444,7 +3470,13 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
             if (ltp > reEntryThreshold) {
               // TRENDING gate — block re-entry if trending is false or unavailable
               if (!lastTrending[trade.symbol]) {
-                addLogToActive(trade.symbol, `RE-ENTRY blocked — TRENDING is false or unavailable at ${currentTime}`);
+                if (lastReEntryBlockedCandle[trade.symbol] !== lastStrategyCandleTime) {
+                  lastReEntryBlockedCandle[trade.symbol] = lastStrategyCandleTime;
+                  const trendingReason = trade.symbol in lastTrending
+                    ? "TRENDING is false"
+                    : "TRENDING is unavailable";
+                  addLogToActive(trade.symbol, `RE-ENTRY blocked — ${trendingReason} at ${currentTime}`);
+                }
                 continue;
               }
               // AI Guard check — block re-entry if AI says sideways/reversing
@@ -3452,8 +3484,11 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
               if (aiSettings.entryGuardEnabled && isAiGuardActive() && aiSymbolEnabled[trade.symbol] === true) {
                 const aiResult = lastAiResult[trade.symbol];
                 if (aiResult && aiResult.blockEntry) {
-                  addLogToActive(trade.symbol, `RE-ENTRY blocked by AI Guard — ${aiResult.marketRegime} (${aiResult.confidence}%) at ${currentTime}`);
-                  addAiLog(`[ai-guard] Auto re-entry blocked for ${trade.symbol}: ${aiResult.reason} (${aiResult.confidence}%)`);
+                  if (lastReEntryBlockedCandle[trade.symbol] !== lastStrategyCandleTime) {
+                    lastReEntryBlockedCandle[trade.symbol] = lastStrategyCandleTime;
+                    addLogToActive(trade.symbol, `RE-ENTRY blocked by AI Guard — ${aiResult.marketRegime} (${aiResult.confidence}%) at ${currentTime}`);
+                    addAiLog(`[ai-guard] Auto re-entry blocked for ${trade.symbol}: ${aiResult.reason} (${aiResult.confidence}%)`);
+                  }
                   continue;
                 }
               }
@@ -4156,6 +4191,10 @@ export function addWaitingTrade(trade: WaitingTrade) {
 
   if (waitingTrades.some((t) => t.symbol === trade.symbol)) return;
 
+  // Clear stale signal state from any previous trade cycle for this symbol
+  delete lastHandledSignalKey[trade.symbol];
+  delete lastBuyCandleTime[trade.symbol];
+
   // Reset first-signal tracking so the loader shows correctly for this (re-)add
   symbolsWithFirstSignal.delete(trade.symbol);
 
@@ -4374,6 +4413,8 @@ export function cancelWaitingTrade(symbol: string) {
 
 
   delete pendingBuyBuffer[symbol];
+  delete lastHandledSignalKey[symbol];
+  delete lastBuyCandleTime[symbol];
 
   setAiSymbolEnabled(symbol, false);
 
@@ -4513,6 +4554,10 @@ export function manualExit(symbol: string, exitPrice: string, lastCandleTime: st
 
   activeTrades = activeTrades.filter((t) => !(t.symbol === symbol && t.status === "COMPLETED"));
 
+  // Clear stale signal state so re-adding the symbol starts fresh
+  delete lastHandledSignalKey[symbol];
+  delete lastBuyCandleTime[symbol];
+
 
 
   persistState();
@@ -4540,6 +4585,8 @@ export function removeCompletedTrade(symbol: string) {
 
 
   delete pendingBuyBuffer[symbol];
+  delete lastHandledSignalKey[symbol];
+  delete lastBuyCandleTime[symbol];
 
   setAiSymbolEnabled(symbol, false);
 
