@@ -1340,7 +1340,8 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
   const initLogs = [
     ...trade.logs,
     logLine,
-    ...(trade.reEntryAfterTargetEnabled ? [`ReEntry enabled: will re-enter if price exceeds exit within ${trade.reEntryCandles} candles after profitable exit`] : []),
+    ...(trade.reEntryAfterTargetEnabled ? [`Auto Re-entry enabled: will re-enter if price exceeds exit within ${trade.reEntryCandles} candles after profitable exit`] : []),
+    ...(trade.signalReEntryEnabled ? [`Signal Re-entry enabled: will re-enter on REENTER signal after any exit`] : []),
   ];
   if (armTrailing) {
     initLogs.push(`ReEntry Trailing SL armed at re-entry ₹${entryPrice} (trail: ${trade.reEntryTrailingPoints} pts)`);
@@ -2096,11 +2097,11 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
     let reEntryMsg = `Cycle ${newCompletedCycles}/${trade.numberOfTrades} completed (SL/Target hit - waiting for next signal)`;
     if (trade.reEntryAfterTargetEnabled && isProfitableExit) {
-      reEntryMsg = `ReEntry armed: watching for price > ₹${exitPrice} within ${trade.reEntryCandles} candles`;
+      reEntryMsg = `Auto Re-entry armed: watching for price > ₹${exitPrice} within ${trade.reEntryCandles} candles`;
     } else if (trade.reEntryAfterTargetEnabled && !isProfitableExit) {
-      reEntryMsg += ` [ReEntry skipped: not a profitable exit]`;
+      reEntryMsg += ` [Auto Re-entry skipped: not a profitable exit]`;
     } else if (!trade.reEntryAfterTargetEnabled) {
-      reEntryMsg += ` [ReEntry disabled]`;
+      reEntryMsg += ` [Auto Re-entry disabled]`;
     }
     if (trade.signalReEntryEnabled) {
       reEntryMsg += ` [Signal Re-entry armed: waiting for REENTER signal]`;
@@ -2858,7 +2859,7 @@ function handleStrategySignal(signal: any) {
 
 
 
-    completeActiveTrade(activeForSymbol.symbol, String(latestClose ?? ""), "SELL triggered for ₹" + String(latestClose ?? "") + " at " + fmtTime(signal.lastCandleTime));
+    completeCycleWithoutExit(activeForSymbol.symbol, String(latestClose ?? ""), "SELL triggered for ₹" + String(latestClose ?? "") + " at " + fmtTime(signal.lastCandleTime));
 
 
 
