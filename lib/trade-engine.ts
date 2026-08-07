@@ -24,6 +24,8 @@ import path from "path";
 
 import { getAiGuardSettings, isAiGuardActive, analyzeMarketRegime, loadAiSettingsFromDisk, addAiLog, addAiErrorLog, type AiSuggestion, type AiAnalysisResult } from "./ai-guard";
 
+import { getNiftyLive } from "./nifty-live";
+
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
@@ -621,7 +623,7 @@ let activeTrades: ActiveTrade[] = [];
 
 let tradeHistory: TradeHistoryItem[] = [];
 
-
+let watchlist: string[] = [];
 
 let lastStrategyCandleTime = "";
 
@@ -848,7 +850,7 @@ function loadState() {
 
       if (Array.isArray(data.tradeHistory)) tradeHistory = data.tradeHistory;
 
-
+      if (Array.isArray(data.watchlist)) watchlist = data.watchlist;
 
       if (typeof data.lastStrategyCandleTime === "string") lastStrategyCandleTime = data.lastStrategyCandleTime;
 
@@ -936,7 +938,7 @@ function persistState() {
 
       tradeHistory,
 
-
+      watchlist,
 
       lastStrategyCandleTime,
 
@@ -2626,7 +2628,7 @@ function handleStrategySignal(signal: any) {
       if (result.suggestExit && currentTrade && currentTrade.inPosition) {
         if (settings.autoExitEnabled) {
           // Auto-execute exit
-          completeActiveTrade(
+          completeCycleWithoutExit(
             currentTrade.symbol,
             String(latestClose ?? ""),
             `AI Guard auto-exit: ${result.reason} (${result.confidence}%) at ${now}`
@@ -3478,6 +3480,22 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
                   addLogToActive(trade.symbol, `RE-ENTRY blocked — ${trendingReason} at ${currentTime}`);
                 }
                 continue;
+              }
+              // NIFTY 50 directional guard — CE requires green, PE requires red
+              const { open: niftyOpen, ltp: niftyLtp } = getNiftyLive();
+              if (niftyOpen > 0 && niftyLtp > 0) {
+                const isCE = trade.symbol.endsWith("CE");
+                const isPE = trade.symbol.endsWith("PE");
+                const niftyGreen = niftyLtp > niftyOpen;
+                const niftyRed = niftyLtp < niftyOpen;
+                if ((isCE && !niftyGreen) || (isPE && !niftyRed)) {
+                  if (lastReEntryBlockedCandle[trade.symbol] !== lastStrategyCandleTime) {
+                    lastReEntryBlockedCandle[trade.symbol] = lastStrategyCandleTime;
+                    const niftyDir = niftyGreen ? "GREEN" : niftyRed ? "RED" : "FLAT";
+                    addLogToActive(trade.symbol, `RE-ENTRY blocked — NIFTY 50 is ${niftyDir} at ${currentTime} (need ${isCE ? "GREEN" : "RED"} for ${isCE ? "CE" : "PE"})`);
+                  }
+                  continue;
+                }
               }
               // AI Guard check — block re-entry if AI says sideways/reversing
               const aiSettings = getAiGuardSettings();
@@ -4647,6 +4665,23 @@ export function removeHistoryEntry(id: string) {
 
 
 
+
+// ——— Watchlist (server-persisted) ———
+
+export function getWatchlist(): string[] {
+  return watchlist;
+}
+
+export function addWatchlistSymbol(symbol: string) {
+  if (watchlist.includes(symbol)) return;
+  watchlist = [...watchlist, symbol];
+  persistState();
+}
+
+export function removeWatchlistSymbol(symbol: string) {
+  watchlist = watchlist.filter((s) => s !== symbol);
+  persistState();
+}
 
 export function ensureEngineRunning() {
 
