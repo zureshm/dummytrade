@@ -145,9 +145,10 @@ export default function TotalExitPopup({ open, onClose }: Props) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-green-600 text-lg">₹</span>
+                  <span className="font-bold text-green-600 text-lg">₹ +</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     className="flex-1 px-3 py-2 rounded-md font-bold text-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       fontSize: "1.2rem",
@@ -156,7 +157,10 @@ export default function TotalExitPopup({ open, onClose }: Props) {
                     }}
                     value={totalTargetValue}
                     disabled={!totalTargetEnabled}
-                    onChange={(e) => setTotalTargetValue(Number(e.target.value))}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/[^0-9]/g, "");
+                      setTotalTargetValue(cleaned === "" ? 0 : Number(cleaned));
+                    }}
                   />
                 </div>
               </div>
@@ -203,18 +207,22 @@ export default function TotalExitPopup({ open, onClose }: Props) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-red-600 text-lg">₹</span>
+                  <span className="font-bold text-red-600 text-lg">₹ -</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     className="flex-1 px-3 py-2 rounded-md font-bold text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       fontSize: "1.2rem",
                       background: "var(--theme-popup-field-bg)",
                       border: "1px solid var(--theme-popup-field-border)",
                     }}
-                    value={totalLossValue}
+                    value={Math.abs(totalLossValue)}
                     disabled={!totalLossEnabled}
-                    onChange={(e) => setTotalLossValue(Number(e.target.value))}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/[^0-9]/g, "");
+                      setTotalLossValue(cleaned === "" ? 0 : -Number(cleaned));
+                    }}
                   />
                 </div>
               </div>

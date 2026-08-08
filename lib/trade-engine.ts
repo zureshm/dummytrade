@@ -686,19 +686,19 @@ export function setTotalExitSettings(settings: { totalTargetEnabled?: boolean; t
   persistState();
 }
 
-function executeTotalExit(reason: string) {
+function executeTotalExit(reason: string, ltpMap: Record<string, number> = {}) {
   console.log(`[trade-engine] ${reason}`);
   
   // 1. Force exit all active trades
   for (const trade of activeTrades) {
     if (trade.status === "ACTIVE") {
-      const lastKnownLtp = lastCandleCloseMap[trade.symbol] || Number(trade.entryPrice);
+      const currentLtp = ltpMap[trade.symbol] || lastCandleCloseMap[trade.symbol] || Number(trade.entryPrice);
       let exitPnl = trade.pnl;
       if (trade.inPosition && Number.isFinite(Number(trade.entryPrice))) {
         const qty = trade.lotSize * trade.lotValue;
-        exitPnl = trade.pnl + (lastKnownLtp - Number(trade.entryPrice)) * qty;
+        exitPnl = trade.pnl + (currentLtp - Number(trade.entryPrice)) * qty;
       }
-      forceExitTrade(trade.symbol, String(lastKnownLtp), exitPnl, reason);
+      forceExitTrade(trade.symbol, String(currentLtp), exitPnl, reason);
     }
   }
 
@@ -3483,12 +3483,12 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
     }
 
     if (totalTargetEnabled && totalAccountPnl >= totalTargetValue) {
-      executeTotalExit(`TOTAL TARGET ₹${totalTargetValue} reached (Total P/L: ₹${totalAccountPnl.toFixed(2)}) at ${currentTime}`);
+      executeTotalExit(`TOTAL TARGET ₹${totalTargetValue} reached (Total P/L: ₹${totalAccountPnl.toFixed(2)}) at ${currentTime}`, ltpMap);
       return; // Stop processing further trades
     }
 
     if (totalLossEnabled && totalAccountPnl <= totalLossValue) {
-      executeTotalExit(`TOTAL LOSS ₹${totalLossValue} reached (Total P/L: ₹${totalAccountPnl.toFixed(2)}) at ${currentTime}`);
+      executeTotalExit(`TOTAL LOSS ₹${totalLossValue} reached (Total P/L: ₹${totalAccountPnl.toFixed(2)}) at ${currentTime}`, ltpMap);
       return; // Stop processing further trades
     }
 
