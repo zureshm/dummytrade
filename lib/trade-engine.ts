@@ -45,17 +45,14 @@ const DB_PATH = path.join(process.cwd(), "data", "trades.json");
 // Add a symbol to angel-feed active strategy symbols (fire-and-forget)
 
 function tryAddActiveStrategySymbol(symbol: string) {
-
+  console.log(`[trade-engine] Notifying feed server to start monitoring ${symbol}...`);
   fetch(`${API_URL}/active-strategy-symbols`, {
-
     method: "POST",
-
     headers: { "Content-Type": "application/json" },
-
     body: JSON.stringify({ symbol }),
-
-  }).catch(() => {});
-
+  })
+    .then(() => console.log(`[trade-engine] Notified feed server for ${symbol}`))
+    .catch((e) => console.error(`[trade-engine] Failed to notify feed server for ${symbol}:`, e));
 }
 
 
@@ -666,11 +663,51 @@ interface PendingBuyBuffer {
   signalType: "BUY" | "REENTER";
   bufferedCandleTime: string;
   candlesElapsed: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  originalSignal: any;
+  originalSignal: unknown;
 }
 const pendingBuyBuffer: Record<string, PendingBuyBuffer> = {};
 const AI_BUFFER_MAX_CANDLES = 1;
+
+// --- Total Exit State ---
+let totalTargetEnabled = false;
+let totalTargetValue = 1200;
+let totalLossEnabled = false;
+let totalLossValue = -1200;
+
+export function getTotalExitSettings() {
+  return { totalTargetEnabled, totalTargetValue, totalLossEnabled, totalLossValue };
+}
+
+export function setTotalExitSettings(settings: { totalTargetEnabled?: boolean; totalTargetValue?: number; totalLossEnabled?: boolean; totalLossValue?: number }) {
+  if (settings.totalTargetEnabled !== undefined) totalTargetEnabled = settings.totalTargetEnabled;
+  if (settings.totalTargetValue !== undefined) totalTargetValue = settings.totalTargetValue;
+  if (settings.totalLossEnabled !== undefined) totalLossEnabled = settings.totalLossEnabled;
+  if (settings.totalLossValue !== undefined) totalLossValue = -Math.abs(settings.totalLossValue);
+  persistState();
+}
+
+function executeTotalExit(reason: string, ltpMap: Record<string, number> = {}) {
+  console.log(`[trade-engine] ${reason}`);
+  
+  // 1. Force exit all active trades
+  for (const trade of activeTrades) {
+    if (trade.status === "ACTIVE") {
+      const currentLtp = ltpMap[trade.symbol] || lastCandleCloseMap[trade.symbol] || Number(trade.entryPrice);
+      let exitPnl = trade.pnl;
+      if (trade.inPosition && Number.isFinite(Number(trade.entryPrice))) {
+        const qty = trade.lotSize * trade.lotValue;
+        exitPnl = trade.pnl + (currentLtp - Number(trade.entryPrice)) * qty;
+      }
+      forceExitTrade(trade.symbol, String(currentLtp), exitPnl, reason);
+    }
+  }
+
+  // 2. Clear all waiting trades
+  waitingTrades = [];
+  
+  // 3. Persist
+  persistState();
+}
 
 
 
@@ -691,26 +728,33 @@ const symbolHistoryStatus: Record<string, { status: string; candleCount: number 
 // eventually succeed (e.g. morning history fetch delays). If found ready,
 // upgrade status and mark initialized so the frontend error banner clears.
 async function checkSymbolHistoryStatus(symbol: string) {
+  console.log(`[trade-engine] Starting history status poll for ${symbol}`);
   const maxAttempts = 12; // Phase 1: ~60s total (every 5s)
   for (let i = 0; i < maxAttempts; i++) {
     try {
+      console.log(`[trade-engine] Checking history status for ${symbol} (attempt ${i + 1}/${maxAttempts})...`);
       const res = await fetch(`${API_URL}/symbol-history-status/${encodeURIComponent(symbol)}`);
       const data = await res.json();
       if (data.status === "ready") {
+        console.log(`[trade-engine] Symbol ${symbol} history is READY (${data.candleCount || 0} candles)`);
         symbolHistoryStatus[symbol] = { status: "ready", candleCount: data.candleCount || 0 };
         symbolsWithFirstSignal.add(symbol);
         return;
       }
       if (data.status === "failed") {
+        console.error(`[trade-engine] Symbol ${symbol} history fetch FAILED at feed server`);
         break;
       }
-    } catch {
-      // Feed server unreachable — will retry
+    } catch (e) {
+      console.warn(`[trade-engine] Feed server unreachable for ${symbol} check, retrying...`);
     }
     await new Promise((r) => setTimeout(r, 5000));
   }
   // Phase 1 ended without "ready" — mark as failed
-  symbolHistoryStatus[symbol] = { status: "failed", candleCount: 0 };
+  if (symbolHistoryStatus[symbol]?.status !== "ready") {
+    console.log(`[trade-engine] Phase 1 poll ended for ${symbol} without readiness. Switching to Phase 2 (30s background poll).`);
+    symbolHistoryStatus[symbol] = { status: "failed", candleCount: 0 };
+  }
 
   // Phase 2: background re-checks every 30s for up to 10 min
   const maxBgAttempts = 20;
@@ -720,9 +764,11 @@ async function checkSymbolHistoryStatus(symbol: string) {
     await new Promise((r) => setTimeout(r, 30000));
     if (!waitingTrades.some((t) => t.symbol === symbol)) return;
     try {
+      console.log(`[trade-engine] Background history status poll for ${symbol} (attempt ${i + 1}/${maxBgAttempts})...`);
       const res = await fetch(`${API_URL}/symbol-history-status/${encodeURIComponent(symbol)}`);
       const data = await res.json();
       if (data.status === "ready") {
+        console.log(`[trade-engine] Symbol ${symbol} history finally READY (${data.candleCount || 0} candles)`);
         symbolHistoryStatus[symbol] = { status: "ready", candleCount: data.candleCount || 0 };
         symbolsWithFirstSignal.add(symbol);
         return;
@@ -858,6 +904,11 @@ function loadState() {
 
       if (data.lastHandledSignalKey != null) lastHandledSignalKey = typeof data.lastHandledSignalKey === "string" ? {} : data.lastHandledSignalKey;
 
+      if (typeof data.totalTargetEnabled === "boolean") totalTargetEnabled = data.totalTargetEnabled;
+      if (typeof data.totalTargetValue === "number") totalTargetValue = data.totalTargetValue;
+      if (typeof data.totalLossEnabled === "boolean") totalLossEnabled = data.totalLossEnabled;
+      if (typeof data.totalLossValue === "number") totalLossValue = data.totalLossValue;
+
 
 
       console.log(`[trade-engine] Loaded state from ${DB_PATH} (${waitingTrades.length} waiting, ${activeTrades.length} active, ${tradeHistory.length} history)`);
@@ -905,21 +956,12 @@ function persistState() {
 
 
   try {
-
-
-
     const dir = path.dirname(DB_PATH);
 
 
 
     if (!fs.existsSync(dir)) {
-
-
-
       fs.mkdirSync(dir, { recursive: true });
-
-
-
     }
 
 
@@ -945,6 +987,13 @@ function persistState() {
 
 
       lastHandledSignalKey,
+
+
+
+      totalTargetEnabled,
+      totalTargetValue,
+      totalLossEnabled,
+      totalLossValue,
 
 
 
@@ -1340,7 +1389,8 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
   const initLogs = [
     ...trade.logs,
     logLine,
-    ...(trade.reEntryAfterTargetEnabled ? [`ReEntry enabled: will re-enter if price exceeds exit within ${trade.reEntryCandles} candles after profitable exit`] : []),
+    ...(trade.reEntryAfterTargetEnabled ? [`Auto Re-entry enabled: will re-enter if price exceeds exit within ${trade.reEntryCandles} candles after profitable exit`] : []),
+    ...(trade.signalReEntryEnabled ? [`Signal Re-entry enabled: will re-enter on REENTER signal after any exit`] : []),
   ];
   if (armTrailing) {
     initLogs.push(`ReEntry Trailing SL armed at re-entry ₹${entryPrice} (trail: ${trade.reEntryTrailingPoints} pts)`);
@@ -2096,11 +2146,11 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
     let reEntryMsg = `Cycle ${newCompletedCycles}/${trade.numberOfTrades} completed (SL/Target hit - waiting for next signal)`;
     if (trade.reEntryAfterTargetEnabled && isProfitableExit) {
-      reEntryMsg = `ReEntry armed: watching for price > ₹${exitPrice} within ${trade.reEntryCandles} candles`;
+      reEntryMsg = `Auto Re-entry armed: watching for price > ₹${exitPrice} within ${trade.reEntryCandles} candles`;
     } else if (trade.reEntryAfterTargetEnabled && !isProfitableExit) {
-      reEntryMsg += ` [ReEntry skipped: not a profitable exit]`;
+      reEntryMsg += ` [Auto Re-entry skipped: not a profitable exit]`;
     } else if (!trade.reEntryAfterTargetEnabled) {
-      reEntryMsg += ` [ReEntry disabled]`;
+      reEntryMsg += ` [Auto Re-entry disabled]`;
     }
     if (trade.signalReEntryEnabled) {
       reEntryMsg += ` [Signal Re-entry armed: waiting for REENTER signal]`;
@@ -2858,7 +2908,7 @@ function handleStrategySignal(signal: any) {
 
 
 
-    completeActiveTrade(activeForSymbol.symbol, String(latestClose ?? ""), "SELL triggered for ₹" + String(latestClose ?? "") + " at " + fmtTime(signal.lastCandleTime));
+    completeCycleWithoutExit(activeForSymbol.symbol, String(latestClose ?? ""), "SELL triggered for ₹" + String(latestClose ?? "") + " at " + fmtTime(signal.lastCandleTime));
 
 
 
@@ -3395,43 +3445,51 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
     // This is the overall trade-level guard — takes priority over per-cycle SL/target.
 
     if (trade.maxProfitLossEnabled) {
-
       const qty = trade.lotSize * trade.lotValue;
-
       const entry = Number(trade.entryPrice);
-
-      const bestPnl = (trade.inPosition && Number.isFinite(entry)) ? (ltp - entry) * qty : 0;
-
-      const worstPnl = (trade.inPosition && Number.isFinite(entry)) ? (ltp - entry) * qty : 0;
-
-
-
       const ltpPnl = (trade.inPosition && Number.isFinite(entry)) ? (ltp - entry) * qty : 0;
 
-
-
-      if (trade.maxProfit > 0 && (trade.pnl + bestPnl) >= trade.maxProfit) {
-
-        const exitPrice = (trade.pnl + ltpPnl) >= trade.maxProfit ? ltp : entry + (trade.maxProfit - trade.pnl) / qty;
-
-        forceExitTrade(trade.symbol, String(exitPrice), trade.pnl + bestPnl, `MAX PROFIT ₹${trade.maxProfit} reached (P/L: ₹${(trade.pnl + bestPnl).toFixed(2)}) at ${currentTime}`);
-
+      if (trade.maxProfit > 0 && (trade.pnl + ltpPnl) >= trade.maxProfit) {
+        forceExitTrade(trade.symbol, String(ltp), trade.pnl + ltpPnl, `MAX PROFIT ₹${trade.maxProfit} reached (P/L: ₹${(trade.pnl + ltpPnl).toFixed(2)}) at ${currentTime}`);
         continue;
-
       }
 
-
-
-      if (trade.maxLoss > 0 && (trade.pnl + worstPnl) <= -trade.maxLoss) {
-
-        const exitPrice = (trade.pnl + ltpPnl) <= -trade.maxLoss ? ltp : entry + (-trade.maxLoss - trade.pnl) / qty;
-
-        forceExitTrade(trade.symbol, String(exitPrice), trade.pnl + worstPnl, `MAX LOSS ₹${trade.maxLoss} reached (P/L: ₹${(trade.pnl + worstPnl).toFixed(2)}) at ${currentTime}`);
-
+      if (trade.maxLoss > 0 && (trade.pnl + ltpPnl) <= -trade.maxLoss) {
+        forceExitTrade(trade.symbol, String(ltp), trade.pnl + ltpPnl, `MAX LOSS ₹${trade.maxLoss} reached (P/L: ₹${(trade.pnl + ltpPnl).toFixed(2)}) at ${currentTime}`);
         continue;
-
       }
+    }
 
+    // --- Global Total Exit check ---
+    let totalAccountPnl = 0;
+    // Realized PNL from completed and active trades
+    for (const t of activeTrades) {
+      totalAccountPnl += t.pnl;
+      // Unrealized PNL for in-position trades
+      if (t.inPosition && t.symbol === trade.symbol) {
+        const qty = t.lotSize * t.lotValue;
+        const entry = Number(t.entryPrice);
+        if (Number.isFinite(entry)) {
+          totalAccountPnl += (ltp - entry) * qty;
+        }
+      } else if (t.inPosition && ltpMap[t.symbol]) {
+        const otherLtp = ltpMap[t.symbol];
+        const qty = t.lotSize * t.lotValue;
+        const entry = Number(t.entryPrice);
+        if (Number.isFinite(entry)) {
+          totalAccountPnl += (otherLtp - entry) * qty;
+        }
+      }
+    }
+
+    if (totalTargetEnabled && totalAccountPnl >= totalTargetValue) {
+      executeTotalExit(`TOTAL TARGET ₹${totalTargetValue} reached (Total P/L: ₹${totalAccountPnl.toFixed(2)}) at ${currentTime}`, ltpMap);
+      return; // Stop processing further trades
+    }
+
+    if (totalLossEnabled && totalAccountPnl <= totalLossValue) {
+      executeTotalExit(`TOTAL LOSS ₹${totalLossValue} reached (Total P/L: ₹${totalAccountPnl.toFixed(2)}) at ${currentTime}`, ltpMap);
+      return; // Stop processing further trades
     }
 
 
