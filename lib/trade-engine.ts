@@ -2495,9 +2495,17 @@ function lockMinTargetPrice(symbol: string, price: number) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function handleStrategySignal(signal: any) {
 
-
-
   if (!signal) return;
+
+  // Auto-detect history readiness from candles in the signal payload
+  const candlesInSignal = Array.isArray(signal.candles) ? signal.candles : [];
+  if (signal.symbol && candlesInSignal.length >= 10) {
+    if (symbolHistoryStatus[signal.symbol]?.status !== "ready") {
+      console.log(`[trade-engine] Symbol ${signal.symbol} history detected in signal (${candlesInSignal.length} candles). Marking as ready.`);
+      symbolHistoryStatus[signal.symbol] = { status: "ready", candleCount: candlesInSignal.length };
+      symbolsWithFirstSignal.add(signal.symbol);
+    }
+  }
 
   // Mark symbol as initialized only when:
   // 1. Its candle time is current (within 5 min of lastStrategyCandleTime)
@@ -2597,6 +2605,12 @@ function handleStrategySignal(signal: any) {
         if (candles.length === 0) {
           addAiLog(`[ai-guard] No chart-history for ${signalSymbol}, skipping`);
           return null;
+        }
+        // Auto-detect history readiness from chart-history response
+        if (symbolHistoryStatus[signalSymbol]?.status !== "ready") {
+          console.log(`[trade-engine] Symbol ${signalSymbol} history detected in chart-history (${candles.length} candles). Marking as ready.`);
+          symbolHistoryStatus[signalSymbol] = { status: "ready", candleCount: candles.length };
+          symbolsWithFirstSignal.add(signalSymbol);
         }
         addAiLog(`[ai-guard] ${signalSymbol}: ${candles.length} candles from chart-history, using last ${Math.min(candles.length, settings.candlesCount)}`);
         return analyzeMarketRegime(signalSymbol, candles, tradeContext);
