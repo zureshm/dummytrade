@@ -4203,6 +4203,13 @@ export function forceInitSymbol(symbol: string) {
   symbolsWithFirstSignal.add(symbol);
 }
 
+// Retry history fetch for a symbol that was force-initialized without history
+export function retryHistoryFetch(symbol: string) {
+  if (!waitingTrades.some((t) => t.symbol === symbol)) return;
+  symbolHistoryStatus[symbol] = { status: "loading", candleCount: 0 };
+  checkSymbolHistoryStatus(symbol);
+}
+
 // Dismiss AI suggestion for a symbol (user clicks Dismiss)
 export function dismissAiSuggestion(symbol: string) {
   for (let i = aiSuggestions.length - 1; i >= 0; i--) {
