@@ -638,8 +638,10 @@ let lastHandledSignalKey: Record<string, string> = {};
 const aiSuggestions: AiSuggestion[] = [];
 const lastAiCandleTime: Record<string, string> = {};
 const lastAiResult: Record<string, AiAnalysisResult> = {};
+const pendingSidewaysExits: Record<string, { retryCount: number; lastRetryTime: number }> = {};
 export function clearAiResults() {
   for (const k of Object.keys(lastAiResult)) delete lastAiResult[k];
+  for (const k of Object.keys(pendingSidewaysExits)) delete pendingSidewaysExits[k];
   aiSuggestions.length = 0;
 }
 
@@ -2692,12 +2694,35 @@ function handleStrategySignal(signal: any) {
         }
       }
 
+      // Clear sideways retry if AI now says trending
+      if (!result.suggestExit || result.marketRegime === "TRENDING") {
+        if (pendingSidewaysExits[signalSymbol]) {
+          addLogToActive(signalSymbol, `AI now confirms TRENDING — sideways exit cancelled at ${now}`);
+          addAiLog(`[ai-guard] ${signalSymbol} returned to TRENDING, clearing sideways retry`);
+          delete pendingSidewaysExits[signalSymbol];
+        }
+      }
+
       // Exit Guard — suggest or auto-execute exit
       // Re-fetch current trade — it may have completed during the async AI call
       const currentTrade = activeTrades.find((t) => t.symbol === signalSymbol && t.status === "ACTIVE");
       if (result.suggestExit && currentTrade && currentTrade.inPosition) {
         if (settings.autoExitEnabled) {
-          // Auto-execute exit
+          // If sideways, start or continue the 30s retry window
+          if (result.marketRegime === "SIDEWAYS") {
+            if (!pendingSidewaysExits[signalSymbol]) {
+              pendingSidewaysExits[signalSymbol] = { retryCount: 0, lastRetryTime: Date.now() };
+              const sideLog = `AI detected SIDEWAYS — waiting 30s with 10s retries before auto-exit at ${now}`;
+              addLogToActive(signalSymbol, sideLog);
+              addAiLog(`[ai-guard] Sideways detected for ${signalSymbol}, starting 30s retry window`);
+              return; // Don't exit yet
+            } else {
+              // Already in retry window, wait for tick to handle it
+              return;
+            }
+          }
+
+          // Auto-execute exit (for REVERSING or immediate exit if not sideways)
           completeCycleWithoutExit(
             currentTrade.symbol,
             String(latestClose ?? ""),
@@ -2705,6 +2730,7 @@ function handleStrategySignal(signal: any) {
           );
           updateLastSellCandleTime(currentTrade.symbol, signal.lastCandleTime ?? "");
           addAiLog(`[ai-guard] Auto-exit executed for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
+          delete pendingSidewaysExits[signalSymbol];
         } else {
           // Add suggestion (if not already suggested for this candle)
           const existing = aiSuggestions.find(
@@ -4116,19 +4142,74 @@ async function tick() {
 
         }
 
-
-
         handleLtpMonitoring(ltpMap);
-
-
 
       } catch { /* market data not running */ }
 
-
-
     }
 
+    // 3. Handle pending sideways exits (10s retries)
+    if (isAiGuardActive()) {
+      const now = Date.now();
+      for (const symbol of Object.keys(pendingSidewaysExits)) {
+        const retry = pendingSidewaysExits[symbol];
+        if (now - retry.lastRetryTime >= 10000) {
+          retry.lastRetryTime = now;
+          retry.retryCount++;
 
+          const activeTrade = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE");
+          if (!activeTrade || !activeTrade.inPosition) {
+            delete pendingSidewaysExits[symbol];
+            continue;
+          }
+
+          const settings = getAiGuardSettings();
+          const tradeContext = {
+            entryPrice: activeTrade.entryPrice,
+            pnl: activeTrade.pnl,
+            signal: activeTrade.lotSize > 0 ? "BUY" : "SELL"
+          };
+
+          addAiLog(`[ai-guard] ${symbol}: Sideways retry #${retry.retryCount}/3...`);
+
+          fetch(`${STRATEGY_URL}/chart-history`)
+            .then(r => r.json())
+            .then(historyData => {
+              const candles = Array.isArray(historyData?.[symbol]) ? historyData[symbol] : [];
+              if (candles.length === 0) return null;
+              return analyzeMarketRegime(symbol, candles, tradeContext);
+            })
+            .then(result => {
+              if (!result) return;
+              lastAiResult[symbol] = result;
+              const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+              if (!result.suggestExit || result.marketRegime === "TRENDING") {
+                addLogToActive(symbol, `AI now confirms TRENDING — sideways exit cancelled at ${timeStr}`);
+                addAiLog(`[ai-guard] ${symbol} returned to TRENDING during retry, clearing sideways retry`);
+                delete pendingSidewaysExits[symbol];
+              } else if (retry.retryCount >= 3) {
+                if (settings.autoExitEnabled) {
+                  completeCycleWithoutExit(
+                    symbol,
+                    String(lastCandleCloseMap[symbol] ?? ""),
+                    `AI Guard auto-exit: Sideways persisted for 30s (${result.reason}, ${result.confidence}%) at ${timeStr}`
+                  );
+                  updateLastSellCandleTime(symbol, lastAiCandleTime[symbol] || "");
+                  addAiLog(`[ai-guard] Auto-exit executed for ${symbol} after 30s sideways persistence`);
+                }
+                delete pendingSidewaysExits[symbol];
+              } else {
+                addLogToActive(symbol, `AI still sideways (${result.reason}, ${result.confidence}%) — retry ${retry.retryCount}/3 at ${timeStr}`);
+                addAiLog(`[ai-guard] ${symbol} still sideways at retry #${retry.retryCount}`);
+              }
+            })
+            .catch(e => {
+              addAiErrorLog(`[ai-guard] Sideways retry error for ${symbol}: ${String(e)}`);
+            });
+        }
+      }
+    }
 
   } catch (e) {
 
