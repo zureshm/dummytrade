@@ -1,0 +1,69 @@
+"use client";
+import { useState } from "react";
+import Image from "next/image";
+import styles from "./page.module.scss";
+import { useRouter } from "next/navigation";
+import { BASE_PATH } from "@/lib/basePath";
+
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [userId, setUserId] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [error, setError] = useState("");
+
+  const handleConnect = () => {
+    setError("");
+    if (
+      userId === process.env.NEXT_PUBLIC_APP_USERNAME &&
+      apiKey === process.env.NEXT_PUBLIC_APP_PASSWORD
+    ) {
+      document.cookie = "dummy_auth=true; path=/dummy; max-age=86400";
+      router.push("/dashboard");
+    } else {
+      setError("Invalid credentials");
+    }
+  };
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.card}>
+        <div className={styles.logo}>
+          <Image src={`${BASE_PATH}/logo.png`} alt="SurAlgoApp" width={180} height={180} priority />
+        </div>
+        <hr className={styles.separator} />
+
+        <div className={styles.formRow}>
+          <label className={styles.label} htmlFor="userId">User ID</label>
+          <input
+            id="userId"
+            className={styles.input}
+            type="text"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+          />
+        </div>
+
+        <div className={styles.formRow}>
+          <label className={styles.label} htmlFor="apiKey">API Key</label>
+          <input
+            id="apiKey"
+            className={styles.input}
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+          />
+        </div>
+
+        {error && <p className={styles.error}>{error}</p>}
+
+        <div className={styles.actions}>
+          <button className={styles.primaryButton} type="button" onClick={handleConnect}>
+            CONNECT
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,114 @@
+import { NextResponse } from "next/server";
+import { getAiGuardSettings, buildCompactCandles, buildMarketMetrics, buildSystemPrompt, buildSystemPromptWithVolume, getProviderConfig } from "@/lib/ai-guard";
+
+// POST /api/ai/TEMP_analyze-test — parse pasted CSV candle data, build prompt, call Groq
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { candleText, symbol } = body;
+
+    if (!candleText || typeof candleText !== "string") {
+      return NextResponse.json({ error: "No candle data provided" }, { status: 400 });
+    }
+
+    const settings = getAiGuardSettings();
+    const bodyKeys = String(body.apiKey || "").split("\n").map((k: string) => k.trim()).filter(Boolean);
+    const effectiveApiKey = bodyKeys[0] || settings.apiKeys?.[0] || "";
+    const provider = settings.provider || "groq";
+    const config = getProviderConfig(provider);
+    if (!effectiveApiKey) {
+      return NextResponse.json({ error: `No API key configured. Set your ${config.providerName} API key in AI Guard settings first.` }, { status: 400 });
+    }
+
+    // Parse CSV lines: time,open,high,low,close[,volume]
+    const lines = candleText.trim().split("\n");
+    const candles: { time: string; open: number; high: number; low: number; close: number; volume?: number }[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.toLowerCase().startsWith("time,") || trimmed.toLowerCase().startsWith("date,")) continue;
+
+      const parts = trimmed.split(",");
+      if (parts.length < 5) continue;
+
+      const time = parts[0].trim();
+      const o = parseFloat(parts[1]);
+      const h = parseFloat(parts[2]);
+      const l = parseFloat(parts[3]);
+      const cl = parseFloat(parts[4]);
+      const vol = parts.length >= 6 ? parseFloat(parts[5]) : undefined;
+
+      if (isNaN(o) || isNaN(h) || isNaN(l) || isNaN(cl)) continue;
+
+      candles.push({ time, open: o, high: h, low: l, close: cl, volume: vol && !isNaN(vol) ? vol : undefined });
+    }
+
+    if (candles.length === 0) {
+      return NextResponse.json({ error: "No valid candle data found. Expected format: time,open,high,low,close[,volume]" }, { status: 400 });
+    }
+
+    const candleCount = settings.candlesCount || 120;
+    const displaySymbol = symbol || "TEST_SYMBOL";
+    const useVolume = settings.considerVolume || false;
+    const useHA = settings.useHeikinAshi !== false;
+
+    // Build the same prompt structure as production
+    const metrics = buildMarketMetrics(candles, candleCount, settings.recentCandlesCount || 30, useVolume, useHA);
+    const compactCandles = buildCompactCandles(candles, candleCount, useVolume, useHA);
+
+    const candleFormat = useVolume ? "time,open,high,low,close,volume" : "time,open,high,low,close";
+    const candleType = useHA ? "Heikin-Ashi OHLC" : "raw OHLC";
+    let userPrompt = `Symbol: ${displaySymbol}\n`;
+    userPrompt += `${metrics}\n\n`;
+    userPrompt += `Candles (${Math.min(candles.length, candleCount)}, 1-min ${candleType}, format: ${candleFormat}):\n${compactCandles}`;
+
+    const systemPrompt = useVolume ? buildSystemPromptWithVolume(settings.recentCandlesCount || 30, useHA) : buildSystemPrompt(settings.recentCandlesCount || 30, useHA);
+
+    // Call AI provider
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const res = await fetch(config.url, {
+      method: "POST",
+      headers: config.headers(effectiveApiKey),
+      body: JSON.stringify(config.buildBody(systemPrompt, userPrompt, 200)),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return NextResponse.json({
+        error: `${config.providerName} API error: ${res.status} ${res.statusText}`,
+        rawResponse: errText,
+      }, { status: 502 });
+    }
+
+    const data = await res.json();
+    const content = config.parseContent(data);
+
+    let parsed: unknown = null;
+    try {
+      const cleaned = content.replace(/```/g, "").replace(/^\s*json\s*/i, "").trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      // AI returned non-JSON
+    }
+
+    return NextResponse.json({
+      candleCount: candles.length,
+      usedCount: Math.min(candles.length, candleCount),
+      promptSent: userPrompt,
+      rawResponse: content,
+      parsed,
+      model: settings.model || config.model,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      return NextResponse.json({ error: "AI API timeout (15s)" }, { status: 504 });
+    }
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+}

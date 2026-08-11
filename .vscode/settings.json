@@ -1,0 +1,13 @@
+{
+    "workbench.colorTheme": "Slick Purple",
+    "css.validate": false,
+    "scss.validate": false,
+    "less.validate": false,
+    "tailwindCSS.includeLanguages": {
+        "css": "css",
+        "scss": "scss"
+    },
+    "tailwindCSS.experimental.classRegex": [
+        ["@apply\\s+([^;]+)", "([^\\s]+)"]
+    ]
+}

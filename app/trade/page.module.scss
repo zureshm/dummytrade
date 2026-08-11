@@ -1,0 +1,256 @@
+.page {
+  min-height: 100vh;
+  padding: 18px;
+  display: grid;
+  place-items: start center;
+  background: var(--theme-card-white);
+}
+
+.card {
+  width: min(520px, 100%);
+  border: 2px solid var(--theme-border-dark);
+  border-radius: 18px;
+  background: var(--theme-card-white);
+  padding: 18px 16px;
+}
+
+.section {
+  padding: 4px 2px;
+}
+
+.sectionHeader {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.sectionTitle {
+  font-weight: 800;
+}
+
+.sectionHeaderWide {
+  display: grid;
+  grid-template-columns: 60%  35%;
+  gap: 12px;
+  align-items: center;
+}
+
+.divider {
+  height: 2px;
+  background: var(--theme-border-subtle-hover);
+  margin: 14px 0;
+}
+
+.details {
+  margin: 0;
+}
+
+.summary {
+  cursor: pointer;
+  font-weight: 800;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 12px 10px;
+  align-items: center;
+}
+
+.checkRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.tradePage {
+  input[type="text"],
+  input[type="number"],
+  select {
+    background: var(--theme-input-bg) !important;
+    border-color: var(--theme-input-border) !important;
+    color: var(--theme-input-text) !important;
+  }
+}
+
+.input {
+  height: 34px;
+  border: 2px solid var(--theme-input-border);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: var(--theme-input-bg);
+  color: var(--theme-input-text);
+}
+
+.select {
+  height: 34px;
+  border: 2px solid var(--theme-input-border);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: var(--theme-input-bg);
+  color: var(--theme-input-text);
+}
+
+.selectSmall {
+  height: 34px;
+  border: 2px solid var(--theme-input-border);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: var(--theme-input-bg);
+  color: var(--theme-input-text);
+}
+
+.note {
+  margin-top: 10px;
+  color: var(--theme-note);
+  font-size: 12px;
+}
+
+.rangeGrid {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.rangeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.rangeLabel {
+  font-size: 13px;
+}
+
+.inputSmall {
+  height: 32px;
+  width: 86px;
+  border: 2px solid var(--theme-border-dark);
+  border-radius: 10px;
+  padding: 0 10px;
+}
+
+.selectTiny {
+  height: 32px;
+  width: 64px;
+  border: 2px solid var(--theme-border-dark);
+  border-radius: 10px;
+  padding: 0 8px;
+  background: var(--theme-card-white);
+}
+
+.tradeTaking {
+  padding: 10px 4px 0;
+}
+
+.availableRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.availableLabel {
+  color: var(--theme-text-muted);
+}
+
+.availableValue {
+  font-weight: 900;
+}
+
+.instrumentRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0 14px;
+}
+
+.instrumentSymbol {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.instrumentPrice {
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.lotRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.lotLeft {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.lotLabel {
+  font-size: 13px;
+  color: var(--theme-text-muted);
+  font-weight: 900;
+}
+
+.lotInput {
+  height: 30px;
+  width: 56px;
+  border: 2px solid var(--theme-border-dark);
+  border-radius: 10px;
+  padding: 0 10px;
+  text-align: center;
+}
+
+.totalText {
+  font-size: 13px;
+  text-align: right;
+  color: var(--theme-text-muted);
+}
+
+.totalEq {
+  margin-left: 10px;
+  font-weight: 900;
+  color: var(--theme-log-bg);
+  white-space: nowrap;
+}
+
+.tradeActions {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.buyBtn {
+  height: 50px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--theme-btn-buy);
+  color: var(--theme-btn-buy-text);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.cancelBtn {
+  height: 50px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--theme-btn-danger);
+  color: var(--theme-btn-danger-text);
+  font-weight: 900;
+  cursor: pointer;
+}
