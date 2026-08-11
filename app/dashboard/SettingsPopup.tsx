@@ -84,6 +84,8 @@ export default function SettingsPopup({ open, onClose }: Props) {
   const [aiAutoExitEnabled, setAiAutoExitEnabled] = useState(false);
   const [aiCandlesCount, setAiCandlesCount] = useState(90);
   const [aiRecentCandlesCount, setAiRecentCandlesCount] = useState(30);
+  const [aiConsiderVolume, setAiConsiderVolume] = useState(false);
+  const [aiUseHeikinAshi, setAiUseHeikinAshi] = useState(true);
   const [aiProvider, setAiProvider] = useState("groq");
   const [aiModel, setAiModel] = useState("llama-3.1-8b-instant");
   const [aiApiKey, setAiApiKey] = useState("");
@@ -140,6 +142,8 @@ export default function SettingsPopup({ open, onClose }: Props) {
           setAiAutoExitEnabled(Boolean(data.autoExitEnabled));
           if (typeof data.candlesCount === "number") setAiCandlesCount(data.candlesCount);
           if (typeof data.recentCandlesCount === "number") setAiRecentCandlesCount(data.recentCandlesCount);
+          if (typeof data.considerVolume === "boolean") setAiConsiderVolume(data.considerVolume);
+          if (typeof data.useHeikinAshi === "boolean") setAiUseHeikinAshi(data.useHeikinAshi);
           if (typeof data.provider === "string") setAiProvider(data.provider);
           if (typeof data.model === "string") setAiModel(data.model);
           if (Array.isArray(data.apiKeys)) setAiApiKey(data.apiKeys.join("\n"));
@@ -150,6 +154,8 @@ export default function SettingsPopup({ open, onClose }: Props) {
           localStorage.setItem("dummy_aiAutoExitEnabled", String(data.autoExitEnabled));
           localStorage.setItem("dummy_aiCandlesCount", String(data.candlesCount));
           localStorage.setItem("dummy_aiRecentCandlesCount", String(data.recentCandlesCount));
+          localStorage.setItem("dummy_aiConsiderVolume", String(data.considerVolume || false));
+          localStorage.setItem("dummy_aiUseHeikinAshi", String(data.useHeikinAshi !== false));
           localStorage.setItem("dummy_aiProvider", data.provider);
           localStorage.setItem("dummy_aiModel", data.model || "llama-3.1-8b-instant");
           localStorage.setItem("dummy_aiApiKey", Array.isArray(data.apiKeys) ? data.apiKeys.join("\n") : (data.apiKey || ""));
@@ -167,6 +173,10 @@ export default function SettingsPopup({ open, onClose }: Props) {
         if (aiCandles) setAiCandlesCount(parseInt(aiCandles, 10));
         const aiRecentCandles = localStorage.getItem("dummy_aiRecentCandlesCount");
         if (aiRecentCandles) setAiRecentCandlesCount(parseInt(aiRecentCandles, 10));
+        const aiVol = localStorage.getItem("dummy_aiConsiderVolume");
+        if (aiVol) setAiConsiderVolume(aiVol === "true");
+        const aiHA = localStorage.getItem("dummy_aiUseHeikinAshi");
+        if (aiHA) setAiUseHeikinAshi(aiHA === "true");
         const aiProv = localStorage.getItem("dummy_aiProvider");
         if (aiProv) setAiProvider(aiProv);
         const aiMdl = localStorage.getItem("dummy_aiModel");
@@ -186,10 +196,12 @@ export default function SettingsPopup({ open, onClose }: Props) {
     localStorage.setItem("dummy_aiAutoExitEnabled", String(aiAutoExitEnabled));
     localStorage.setItem("dummy_aiCandlesCount", String(aiCandlesCount));
     localStorage.setItem("dummy_aiRecentCandlesCount", String(aiRecentCandlesCount));
+    localStorage.setItem("dummy_aiConsiderVolume", String(aiConsiderVolume));
+    localStorage.setItem("dummy_aiUseHeikinAshi", String(aiUseHeikinAshi));
     localStorage.setItem("dummy_aiProvider", aiProvider);
     localStorage.setItem("dummy_aiModel", aiModel);
     localStorage.setItem("dummy_aiApiKey", aiApiKey);
-  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiProvider, aiModel, aiApiKey]);
+  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiConsiderVolume, aiUseHeikinAshi, aiProvider, aiModel, aiApiKey]);
 
   // POST AI Guard settings to backend (debounced, only after initial server load)
   const postAiSettings = useCallback(() => {
@@ -205,13 +217,15 @@ export default function SettingsPopup({ open, onClose }: Props) {
           autoExitEnabled: aiAutoExitEnabled,
           candlesCount: aiCandlesCount,
           recentCandlesCount: aiRecentCandlesCount,
+          considerVolume: aiConsiderVolume,
+          useHeikinAshi: aiUseHeikinAshi,
           provider: aiProvider,
           model: aiModel,
           apiKeys: aiApiKey,
         }),
       }).catch(() => {});
     }, 500);
-  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiProvider, aiModel, aiApiKey]);
+  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiConsiderVolume, aiUseHeikinAshi, aiProvider, aiModel, aiApiKey]);
 
   useEffect(() => { postAiSettings(); }, [postAiSettings]);
 
@@ -745,6 +759,82 @@ export default function SettingsPopup({ open, onClose }: Props) {
                           border: "1px solid var(--theme-popup-field-border)",
                         }}
                       />
+                    </div>
+                  </div>
+
+                  {/* Consider Volume toggle */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>Consider Volume</label>
+                      <button
+                        type="button"
+                        onClick={() => setAiConsiderVolume(!aiConsiderVolume)}
+                        style={{
+                          width: 36,
+                          height: 20,
+                          borderRadius: 10,
+                          background: aiConsiderVolume ? "var(--theme-popup-border)" : "var(--theme-popup-field-border)",
+                          position: "relative",
+                          transition: "background 0.2s",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 2,
+                            left: aiConsiderVolume ? 19 : 2,
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: "#fff",
+                            transition: "left 0.2s",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                          }}
+                        />
+                      </button>
+                    </div>
+                    <div className="text-xs mt-0.5" style={{ color: "var(--theme-popup-label)" }}>
+                      Include volume data in AI prompt for analysis
+                    </div>
+                  </div>
+
+                  {/* Heikin-Ashi Smoothing toggle */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>Heikin-Ashi Smoothing</label>
+                      <button
+                        type="button"
+                        onClick={() => setAiUseHeikinAshi(!aiUseHeikinAshi)}
+                        style={{
+                          width: 36,
+                          height: 20,
+                          borderRadius: 10,
+                          background: aiUseHeikinAshi ? "var(--theme-popup-border)" : "var(--theme-popup-field-border)",
+                          position: "relative",
+                          transition: "background 0.2s",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 2,
+                            left: aiUseHeikinAshi ? 19 : 2,
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: "#fff",
+                            transition: "left 0.2s",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                          }}
+                        />
+                      </button>
+                    </div>
+                    <div className="text-xs mt-0.5" style={{ color: "var(--theme-popup-label)" }}>
+                      Smooth candle data with Heikin-Ashi before AI analysis
                     </div>
                   </div>
 
