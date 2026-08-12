@@ -2637,6 +2637,45 @@ function handleStrategySignal(signal: any) {
         }
       const now = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
 
+      // Always update AI suggestions list for both waiting and active trades
+      // This ensures the UI message bubble is always current and visible for all regimes
+      const matchingWaiting = waitingTrades.find((t) => t.symbol === signalSymbol);
+      const matchingActive = activeTrades.find((t) => t.symbol === signalSymbol && t.status === "ACTIVE");
+
+      if (matchingWaiting) {
+        for (let i = aiSuggestions.length - 1; i >= 0; i--) {
+          if (aiSuggestions[i].symbol === signalSymbol && aiSuggestions[i].type === "ENTRY_BLOCKED") {
+            aiSuggestions.splice(i, 1);
+          }
+        }
+        aiSuggestions.push({
+          symbol: signalSymbol,
+          type: "ENTRY_BLOCKED",
+          marketRegime: result.marketRegime,
+          confidence: result.confidence,
+          reason: result.reason,
+          timestamp: now,
+          dismissed: false,
+        });
+      }
+
+      if (matchingActive) {
+        for (let i = aiSuggestions.length - 1; i >= 0; i--) {
+          if (aiSuggestions[i].symbol === signalSymbol && aiSuggestions[i].type === "EXIT_SUGGESTED") {
+            aiSuggestions.splice(i, 1);
+          }
+        }
+        aiSuggestions.push({
+          symbol: signalSymbol,
+          type: "EXIT_SUGGESTED",
+          marketRegime: result.marketRegime,
+          confidence: result.confidence,
+          reason: result.reason,
+          timestamp: now,
+          dismissed: false,
+        });
+      }
+
       // EntryGuard — block BUY if sideways/reversing
       if (settings.entryGuardEnabled && result.blockEntry) {
         // If there's a buffered BUY, increment its candle count
@@ -2658,21 +2697,6 @@ function handleStrategySignal(signal: any) {
           }
         }
 
-        // Remove any existing entry-blocked suggestion for this symbol
-        for (let i = aiSuggestions.length - 1; i >= 0; i--) {
-          if (aiSuggestions[i].symbol === signalSymbol && aiSuggestions[i].type === "ENTRY_BLOCKED") {
-            aiSuggestions.splice(i, 1);
-          }
-        }
-        aiSuggestions.push({
-          symbol: signalSymbol,
-          type: "ENTRY_BLOCKED",
-          marketRegime: result.marketRegime,
-          confidence: result.confidence,
-          reason: result.reason,
-          timestamp: now,
-          dismissed: false,
-        });
         addAiLog(`[ai-guard] Entry blocked for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
       } else if (settings.entryGuardEnabled && !result.blockEntry) {
         // AI says trending — if there's a buffered BUY, fire it now
@@ -2732,23 +2756,8 @@ function handleStrategySignal(signal: any) {
           addAiLog(`[ai-guard] Auto-exit executed for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
           delete pendingSidewaysExits[signalSymbol];
         } else {
-          // Add suggestion (if not already suggested for this candle)
-          const existing = aiSuggestions.find(
-            (s) => s.symbol === signalSymbol && s.type === "EXIT_SUGGESTED" && !s.dismissed
-          );
-          if (!existing) {
-            aiSuggestions.push({
-              symbol: signalSymbol,
-              type: "EXIT_SUGGESTED",
-              marketRegime: result.marketRegime,
-              confidence: result.confidence,
-              reason: result.reason,
-              timestamp: now,
-              dismissed: false,
-            });
-            addLogToActive(signalSymbol, `AI Guard: exit suggested — ${result.reason} (${result.confidence}%) at ${now}`);
-            addAiLog(`[ai-guard] Exit suggested for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
-          }
+          // Suggest exit (already updated in the global suggestion block above)
+          addAiLog(`[ai-guard] Exit suggested for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
         }
       }
     }).catch((e) => {
@@ -4183,6 +4192,22 @@ async function tick() {
               if (!result) return;
               lastAiResult[symbol] = result;
               const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+              // Update AI suggestions list during retry
+              for (let i = aiSuggestions.length - 1; i >= 0; i--) {
+                if (aiSuggestions[i].symbol === symbol && aiSuggestions[i].type === "EXIT_SUGGESTED") {
+                  aiSuggestions.splice(i, 1);
+                }
+              }
+              aiSuggestions.push({
+                symbol,
+                type: "EXIT_SUGGESTED",
+                marketRegime: result.marketRegime,
+                confidence: result.confidence,
+                reason: result.reason,
+                timestamp: timeStr,
+                dismissed: false,
+              });
 
               if (!result.suggestExit || result.marketRegime === "TRENDING") {
                 addLogToActive(symbol, `AI now confirms TRENDING — sideways exit cancelled at ${timeStr}`);

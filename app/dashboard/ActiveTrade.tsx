@@ -311,6 +311,18 @@ export default function ActiveTrade({
                   (s) => s.symbol === t.symbol && s.type === "EXIT_SUGGESTED" && !s.dismissed
                 );
                 if (!suggestion) return null;
+
+                const ru = suggestion.marketRegime.toUpperCase();
+                let themeColor = "#a855f7"; // SIDEWAYS (Purple)
+                let label = "AI suggests CAUTION (Sideways)";
+                if (ru.includes("TREND") || ru.includes("UP") || ru.includes("BULL")) {
+                  themeColor = "#22c55e"; // TRENDING (Green)
+                  label = "AI confirms TRENDING";
+                } else if (ru.includes("REVERS") || ru.includes("DOWN") || ru.includes("BEAR")) {
+                  themeColor = "#ef4444"; // REVERSING (Red)
+                  label = "AI suggests EXIT";
+                }
+
                 return (
                   <div style={{
                     display: "flex",
@@ -318,14 +330,14 @@ export default function ActiveTrade({
                     gap: "6px",
                     padding: "8px 10px",
                     borderRadius: "6px",
-                    background: "rgba(245,158,11,0.08)",
-                    border: "1px solid rgba(245,158,11,0.25)",
+                    background: `${themeColor}14`, // alpha 0.08
+                    border: `1px solid ${themeColor}40`, // alpha 0.25
                     marginBottom: "6px",
                   }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                      <AlertTriangle className="w-4 h-4" style={{ color: "#f59e0b", flexShrink: 0, marginTop: "1px" }} />
+                      <AlertTriangle className="w-4 h-4" style={{ color: themeColor, flexShrink: 0, marginTop: "1px" }} />
                       <div style={{ flex: 1, fontSize: "12px", lineHeight: "16px" }}>
-                        <span style={{ fontWeight: 600, color: "#f59e0b" }}>AI suggests EXIT</span>
+                        <span style={{ fontWeight: 600, color: themeColor }}>{label}</span>
                         <span style={{ color: "var(--theme-text-gray-500)", marginLeft: "6px" }}>— {suggestion.reason} ({suggestion.confidence}%)</span>
                       </div>
                     </div>
@@ -703,6 +715,18 @@ export default function ActiveTrade({
                     (s) => s.symbol === t.symbol && s.type === "ENTRY_BLOCKED" && !s.dismissed
                   );
                   if (!suggestion) return null;
+
+                  const ru = suggestion.marketRegime.toUpperCase();
+                  let themeColor = "#a855f7"; // SIDEWAYS (Purple)
+                  let label = "AI blocked entry (Sideways)";
+                  if (ru.includes("TREND") || ru.includes("UP") || ru.includes("BULL")) {
+                    themeColor = "#22c55e"; // TRENDING (Green)
+                    label = "AI confirms TRENDING";
+                  } else if (ru.includes("REVERS") || ru.includes("DOWN") || ru.includes("BEAR")) {
+                    themeColor = "#ef4444"; // REVERSING (Red)
+                    label = "AI blocked entry (Reversal)";
+                  }
+
                   return (
                     <div style={{
                       position: "relative",
@@ -711,8 +735,8 @@ export default function ActiveTrade({
                       gap: "6px",
                       padding: "8px 10px",
                       borderRadius: "6px",
-                      background: "rgba(239,68,68,0.08)",
-                      border: "1px solid rgba(239,68,68,0.25)",
+                      background: `${themeColor}14`, // alpha 0.08
+                      border: `1px solid ${themeColor}40`, // alpha 0.25
                       marginBottom: "6px",
                     }}>
                       <button
@@ -731,8 +755,8 @@ export default function ActiveTrade({
                           width: "20px",
                           height: "20px",
                           borderRadius: "50%",
-                          border: "1px solid rgba(239,68,68,0.3)",
-                          background: "#ef4444",
+                          border: `1px solid ${themeColor}4D`, // alpha 0.3
+                          background: themeColor,
                           color: "#fff",
                           display: "flex",
                           alignItems: "center",
@@ -749,9 +773,9 @@ export default function ActiveTrade({
                         ×
                       </button>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                        <AlertTriangle className="w-4 h-4" style={{ color: "#ef4444", flexShrink: 0, marginTop: "1px" }} />
+                        <AlertTriangle className="w-4 h-4" style={{ color: themeColor, flexShrink: 0, marginTop: "1px" }} />
                         <div style={{ flex: 1, fontSize: "12px", lineHeight: "16px" }}>
-                          <span style={{ fontWeight: 600, color: "#ef4444" }}>AI blocked entry</span>
+                          <span style={{ fontWeight: 600, color: themeColor }}>{label}</span>
                           <span style={{ color: "var(--theme-text-gray-500)", marginLeft: "6px" }}>— {suggestion.reason} ({suggestion.confidence}%)</span>
                         </div>
                       </div>
