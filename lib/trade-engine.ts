@@ -292,249 +292,89 @@ type WaitingTrade = {
   reEntryMinTargetPoints: number;
   reEntryMinTargetTrigger: number;
   reEntryMinTargetTrailing: boolean;
-
   pendingSkippedBuy?: boolean;
-
   signalReEntryEnabled: boolean;
-
   triggerTimerEnabled?: boolean;
+  triggerTimeEnabled?: boolean;
+  triggerPriceEnabled?: boolean;
   triggerHours?: number;
   triggerMinutes?: number;
   triggerSeconds?: number;
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
-
 };
 
-
-
-
-
-
-
 type ActiveTrade = {
-
-
-
   symbol: string;
-
-
-
   entryPrice: string;
-
-
-
   pnl: number;
-
-
-
   logs: string[];
-
-
-
   lotSize: number;
-
-
-
   lotValue: number;
-
-
-
   numberOfTrades: number;
-
-
-
   stopLossNumberEnabled: boolean;
-
-
-
   stopLossNumber: number;
-
-
-
   targetPointsEnabled: boolean;
-
-
-
   targetPoints: number;
-
-
-
   targetMode: "live" | "candleClose";
-
-
-
   minToHoldEnabled: boolean;
-
-
-
   minToHold: number;
-
-
-
   minToHoldTrigger: number;
-
-
-
   minToHoldTrailing: boolean;
-
-
-
   trailingAfterTargetEnabled: boolean;
-
-
-
   trailingAfterTarget: number;
-
-
-
   trailingMode: "live" | "candleClose";
-
-
-
   trailingTrailActive: boolean;
-
-
-
   trailingHighWatermark?: number;
-
-
-
   minTargetHighWatermark?: number;
-
-
-
   minTargetLockedPrice?: number;
-
-
-
   rangeEnabled: boolean;
-
-
-
   timeFrom: string;
-
-
-
   timeFromAmpm: string;
-
-
-
   timeTo: string;
-
-
-
   timeToAmpm: string;
-
-
-
   inPosition: boolean;
-
-
-
   completedCycles: number;
-
-
-
   entryTime?: string;
-
-
-
   exitTime?: string;
-
-
-
   exitPrice?: string;
-
-
-
   status: "ACTIVE" | "COMPLETED";
-
-
-
   buyOverride?: number;
-
-
-
   waitAfterSellEnabled: boolean;
-
-
-
   waitAfterSellCandles: number;
-
-
-
   sellWhenLossCandlesEnabled: boolean;
-
-
-
   sellWhenLossCandles: number;
-
-
-
   lastSellCandleTime?: string;
-
-
-
   maxProfitLossEnabled: boolean;
-
-
-
   maxProfit: number;
-
-
-
   maxLoss: number;
-
-
-
   reEntryAfterTargetEnabled: boolean;
-
-
-
   reEntryCandles: number;
   reEntryPoints: number;
   reEntryStopLossEnabled: boolean;
   reEntryStopLoss: number;
   reEntryAsTrailingEnabled: boolean;
   reEntryTrailingPoints: number;
-
   reEntryMinTargetEnabled: boolean;
   reEntryMinTargetPoints: number;
   reEntryMinTargetTrigger: number;
   reEntryMinTargetTrailing: boolean;
   isReEntryCycle?: boolean;
-
   reEntryExitPrice?: number;
-
-
-
   reEntrySellTime?: string;
-
-
-
   reEntryReason?: string;
-
   pendingSkippedBuy?: boolean;
-
   signalReEntryEnabled: boolean;
-
   signalReEntryArmed?: boolean;
-
   triggerTimerEnabled?: boolean;
+  triggerTimeEnabled?: boolean;
+  triggerPriceEnabled?: boolean;
   triggerHours?: number;
   triggerMinutes?: number;
   triggerSeconds?: number;
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
-
 };
-
-
-
-
-
-
 
 type TradeHistoryItem = {
 
@@ -1634,6 +1474,8 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
     signalReEntryArmed: false,
 
     triggerTimerEnabled: trade.triggerTimerEnabled,
+    triggerTimeEnabled: trade.triggerTimeEnabled,
+    triggerPriceEnabled: trade.triggerPriceEnabled,
     triggerHours: trade.triggerHours,
     triggerMinutes: trade.triggerMinutes,
     triggerSeconds: trade.triggerSeconds,
@@ -4289,8 +4131,8 @@ async function tick() {
       }
     }
 
-    // 4. Trigger Timer check — auto-activate waiting trades at specified time if price in range
-    // Uses server system time (IST), fires within 60s window starting from target HH:MM:SS
+    // 4. Auto Trigger check — auto-activate waiting trades based on time and/or price
+    // Uses server system time (IST) and live LTP from API
     const sysNow = new Date();
     const sysH = sysNow.getHours();
     const sysM = sysNow.getMinutes();
@@ -4299,47 +4141,87 @@ async function tick() {
     const sysTimeStr = `${String(sysH).padStart(2, "0")}:${String(sysM).padStart(2, "0")}:${String(sysS).padStart(2, "0")}`;
 
     for (const trade of waitingTrades) {
+      // Master toggle must be enabled
       if (!trade.triggerTimerEnabled) continue;
       if (triggerTimerFired.has(trade.symbol)) continue;
 
-      const targetH = trade.triggerHours ?? 0;
-      const targetM = trade.triggerMinutes ?? 0;
-      const targetS = trade.triggerSeconds ?? 0;
-      const targetTotalSecs = targetH * 3600 + targetM * 60 + targetS;
+      const timeEnabled = trade.triggerTimeEnabled !== false; // Default true for backward compatibility
+      const priceEnabled = trade.triggerPriceEnabled !== false; // Default true for backward compatibility
 
-      // Fire when current time is within [target, target + 60] seconds
-      if (sysTotalSecs < targetTotalSecs || sysTotalSecs > targetTotalSecs + 60) continue;
+      if (!timeEnabled && !priceEnabled) continue; // Nothing to check
 
-      const minP = trade.triggerMinPrice ?? 0;
-      const maxP = trade.triggerMaxPrice ?? Infinity;
+      // 1. Time Check
+      let timeMatched = true;
+      if (timeEnabled) {
+        const targetH = trade.triggerHours ?? 0;
+        const targetM = trade.triggerMinutes ?? 0;
+        const targetS = trade.triggerSeconds ?? 0;
+        const targetTotalSecs = targetH * 3600 + targetM * 60 + targetS;
+        
+        // Match if current time is within [target, target + 60] seconds
+        timeMatched = (sysTotalSecs >= targetTotalSecs && sysTotalSecs <= targetTotalSecs + 60);
+      }
 
-      // Fetch live LTP for price check
-      let ltp: number = NaN;
-      try {
-        const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(trade.symbol)}`);
-        const prices = await res.json();
-        ltp = Array.isArray(prices) && prices[0]?.ltp != null ? Number(prices[0].ltp) : NaN;
-      } catch {
-        console.log(`[trigger-timer] ${trade.symbol}: LTP fetch failed, skipping`);
+      if (!timeMatched) continue;
+
+      // 2. Price Check
+      let priceMatched = true;
+      let currentLtp: number = NaN;
+
+      if (priceEnabled) {
+        const minP = trade.triggerMinPrice ?? 0;
+        const maxP = trade.triggerMaxPrice ?? Infinity;
+
+        // Fetch live LTP for price check
+        try {
+          const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(trade.symbol)}`);
+          const prices = await res.json();
+          currentLtp = Array.isArray(prices) && prices[0]?.ltp != null ? Number(prices[0].ltp) : NaN;
+        } catch {
+          console.log(`[auto-trigger] ${trade.symbol}: LTP fetch failed, skipping`);
+          continue; 
+        }
+
+        if (!Number.isFinite(currentLtp)) {
+          console.log(`[auto-trigger] ${trade.symbol}: no valid LTP, skipping`);
+          continue;
+        }
+
+        priceMatched = (currentLtp >= minP && currentLtp <= maxP);
+      } else {
+        // If price is not enabled, we still need LTP for activation
+        try {
+          const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(trade.symbol)}`);
+          const prices = await res.json();
+          currentLtp = Array.isArray(prices) && prices[0]?.ltp != null ? Number(prices[0].ltp) : NaN;
+        } catch {}
+      }
+
+      // If price is enabled but not matched, we just skip this tick (wait for price to enter range)
+      // EXCEPT if Time is also enabled and matched - if time matched but price didn't, we mark as fired (missed window)
+      if (priceEnabled && !priceMatched) {
+        if (timeEnabled) {
+          // Time matched but price didn't - window will eventually pass
+          // If we're at the very end of the 60s window, we can mark as fired to stop trying
+          if (sysTotalSecs > (trade.triggerHours ?? 0) * 3600 + (trade.triggerMinutes ?? 0) * 60 + (trade.triggerSeconds ?? 0) + 55) {
+             console.log(`[auto-trigger] ${trade.symbol}: Time window closing, price never hit range. Marking as fired.`);
+             addLogToWaiting(trade.symbol, `Auto Trigger: Time window passed, price ${currentLtp} never entered range.`);
+             triggerTimerFired.add(trade.symbol);
+          }
+        }
         continue;
       }
 
-      if (!Number.isFinite(ltp)) {
-        console.log(`[trigger-timer] ${trade.symbol}: no valid LTP, skipping`);
-        continue;
-      }
+      // Both conditions (that are enabled) are met!
+      const ltpStr = Number.isFinite(currentLtp) ? String(currentLtp) : "0";
+      const reasonParts = [];
+      if (timeEnabled) reasonParts.push(`Time ${sysTimeStr}`);
+      if (priceEnabled) reasonParts.push(`Price ₹${currentLtp}`);
+      const reason = reasonParts.join(" & ");
 
-      if (ltp < minP || ltp > maxP) {
-        console.log(`[trigger-timer] ${trade.symbol}: LTP ${ltp} outside range [${minP}, ${maxP}], skipping`);
-        addLogToWaiting(trade.symbol, `Trigger Timer: LTP ${ltp} outside range [${minP}, ${maxP}] at ${sysTimeStr}`);
-        triggerTimerFired.add(trade.symbol);
-        continue;
-      }
-
-      // Price in range — activate the trade
-      console.log(`[trigger-timer] ${trade.symbol}: LTP ${ltp} in range [${minP}, ${maxP}], activating!`);
-      addLogToWaiting(trade.symbol, `Trigger Timer fired at ${sysTimeStr} — LTP ${ltp} in range [${minP}, ${maxP}]`);
-      activateWaitingTrade(trade.symbol, String(ltp), `Trigger Timer BUY at ₹${ltp} at ${sysTimeStr}`);
+      console.log(`[auto-trigger] ${trade.symbol}: ${reason} met, activating!`);
+      addLogToWaiting(trade.symbol, `Auto Trigger fired (${reason})`);
+      activateWaitingTrade(trade.symbol, ltpStr, `Auto Trigger BUY at ₹${ltpStr} (${reason})`);
       triggerTimerFired.add(trade.symbol);
     }
 
@@ -4492,7 +4374,8 @@ export function updateActiveTradeConfig(symbol: string, config: Record<string, u
     "signalReEntryEnabled",
     "rangeEnabled", "timeFrom", "timeFromAmpm", "timeTo", "timeToAmpm",
     "buyOverride", "waitAfterSellEnabled", "waitAfterSellCandles",
-    "triggerTimerEnabled", "triggerHours", "triggerMinutes", "triggerSeconds", "triggerMinPrice", "triggerMaxPrice",
+    "triggerTimerEnabled", "triggerTimeEnabled", "triggerPriceEnabled",
+    "triggerHours", "triggerMinutes", "triggerSeconds", "triggerMinPrice", "triggerMaxPrice",
   ];
 
   const safeUpdate: Record<string, unknown> = {};

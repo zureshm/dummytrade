@@ -54,6 +54,8 @@ export type WaitingTrade = {
   pendingSkippedBuy?: boolean;
   signalReEntryEnabled: boolean;
   triggerTimerEnabled?: boolean;
+  triggerTimeEnabled?: boolean;
+  triggerPriceEnabled?: boolean;
   triggerHours?: number;
   triggerMinutes?: number;
   triggerSeconds?: number;
@@ -123,6 +125,8 @@ export type ActiveTrade = {
   signalReEntryEnabled: boolean;
   signalReEntryArmed?: boolean;
   triggerTimerEnabled?: boolean;
+  triggerTimeEnabled?: boolean;
+  triggerPriceEnabled?: boolean;
   triggerHours?: number;
   triggerMinutes?: number;
   triggerSeconds?: number;
@@ -401,6 +405,8 @@ export function TradeStoreProvider({
       pendingSkippedBuy: false,
       signalReEntryEnabled: readFormBool(sym, "signalReEntryEnabled", true),
       triggerTimerEnabled: readFormBool(sym, "triggerTimerEnabled", false),
+      triggerTimeEnabled: readFormBool(sym, "triggerTimeEnabled", true),
+      triggerPriceEnabled: readFormBool(sym, "triggerPriceEnabled", true),
       triggerHours: readFormNumberAllowZero(sym, "triggerHours", 9),
       triggerMinutes: readFormNumberAllowZero(sym, "triggerMinutes", 15),
       triggerSeconds: readFormNumberAllowZero(sym, "triggerSeconds", 0),
@@ -504,6 +510,14 @@ export function TradeStoreProvider({
       pendingSkippedBuy: false,
       signalReEntryEnabled: tradeToActivate.signalReEntryEnabled,
       signalReEntryArmed: false,
+      triggerTimerEnabled: tradeToActivate.triggerTimerEnabled,
+      triggerTimeEnabled: tradeToActivate.triggerTimeEnabled,
+      triggerPriceEnabled: tradeToActivate.triggerPriceEnabled,
+      triggerHours: tradeToActivate.triggerHours,
+      triggerMinutes: tradeToActivate.triggerMinutes,
+      triggerSeconds: tradeToActivate.triggerSeconds,
+      triggerMinPrice: tradeToActivate.triggerMinPrice,
+      triggerMaxPrice: tradeToActivate.triggerMaxPrice,
     };
 
     setActiveTrades((prev) => [...prev, newActiveTrade]);

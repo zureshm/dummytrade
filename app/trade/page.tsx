@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { HelpCircle, ShieldAlert, Clock, Target, RefreshCw, Timer } from "lucide-react";
 import { useTradeStore, WaitingTrade } from "../store/TradeStore";
 import { useRouter } from "next/navigation";
@@ -14,9 +14,20 @@ import { setActiveSymbol } from "@/lib/api";
 import styles from "./page.module.scss";
 import { BASE_PATH } from "@/lib/basePath";
 
-function NumericInput({ value, onChange, onBlur, fallback = "0", ...props }: any) {
+interface NumericInputProps extends Omit<React.ComponentProps<typeof Input>, "value" | "onChange"> {
+  value: number | undefined | null;
+  onChange: (val: number) => void;
+  fallback?: string;
+}
+
+function NumericInput({ value, onChange, onBlur, fallback = "0", ...props }: NumericInputProps) {
   const [local, setLocal] = useState<string>(value != null ? String(value) : "");
-  useEffect(() => { setLocal(value != null ? String(value) : ""); }, [value]);
+  const [prevValue, setPrevValue] = useState(value);
+
+  if (value !== prevValue) {
+    setLocal(value != null ? String(value) : "");
+    setPrevValue(value);
+  }
   return (
     <Input
       {...props}
@@ -29,17 +40,31 @@ function NumericInput({ value, onChange, onBlur, fallback = "0", ...props }: any
         setLocal(cleaned);
         onChange(cleaned === "" ? 0 : Number(cleaned));
       }}
-      onBlur={(e: any) => {
-        if (!e.target.value) { setLocal(fallback); onChange(Number(fallback)); }
+      onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+        if (!e.target.value) {
+          setLocal(fallback);
+          onChange(Number(fallback));
+        }
         onBlur?.(e);
       }}
     />
   );
 }
 
-function NumericField({ value, onChange, onBlur, fallback = "0", ...props }: any) {
+interface NumericFieldProps extends Omit<React.ComponentProps<"input">, "value" | "onChange"> {
+  value: number | undefined | null;
+  onChange: (val: number) => void;
+  fallback?: string;
+}
+
+function NumericField({ value, onChange, onBlur, fallback = "0", ...props }: NumericFieldProps) {
   const [local, setLocal] = useState<string>(value != null ? String(value) : "");
-  useEffect(() => { setLocal(value != null ? String(value) : ""); }, [value]);
+  const [prevValue, setPrevValue] = useState(value);
+
+  if (value !== prevValue) {
+    setLocal(value != null ? String(value) : "");
+    setPrevValue(value);
+  }
   return (
     <input
       {...props}
@@ -52,8 +77,11 @@ function NumericField({ value, onChange, onBlur, fallback = "0", ...props }: any
         setLocal(cleaned);
         onChange(cleaned === "" ? 0 : Number(cleaned));
       }}
-      onBlur={(e: any) => {
-        if (!e.target.value) { setLocal(fallback); onChange(Number(fallback)); }
+      onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+        if (!e.target.value) {
+          setLocal(fallback);
+          onChange(Number(fallback));
+        }
         onBlur?.(e);
       }}
     />
@@ -166,6 +194,8 @@ export default function TradePage() {
 
   // Trigger Timer (UI only)
   const [triggerTimerEnabled, setTriggerTimerEnabled] = useState(false);
+  const [triggerTimeEnabled, setTriggerTimeEnabled] = useState(true);
+  const [triggerPriceEnabled, setTriggerPriceEnabled] = useState(true);
   const [triggerHours, setTriggerHours] = useState(9);
   const [triggerMinutes, setTriggerMinutes] = useState(15);
   const [triggerSeconds, setTriggerSeconds] = useState(10);
@@ -285,6 +315,8 @@ export default function TradePage() {
         setReEntryMinTargetTrailing(data.reEntryMinTargetTrailing === true ? "yes" : "no");
         setSignalReEntryEnabled(Boolean(data.signalReEntryEnabled ?? true));
         setTriggerTimerEnabled(Boolean(data.triggerTimerEnabled ?? false));
+        setTriggerTimeEnabled(Boolean(data.triggerTimeEnabled ?? true));
+        setTriggerPriceEnabled(Boolean(data.triggerPriceEnabled ?? true));
         setTriggerHours(data.triggerHours ?? 9);
         setTriggerMinutes(data.triggerMinutes ?? 15);
         setTriggerSeconds(data.triggerSeconds ?? 10);
@@ -349,6 +381,8 @@ export default function TradePage() {
       minToHoldTrailing: minToHoldTrailing === "yes",
       signalReEntryEnabled,
       triggerTimerEnabled,
+      triggerTimeEnabled,
+      triggerPriceEnabled,
       triggerHours,
       triggerMinutes,
       triggerSeconds,
@@ -405,7 +439,7 @@ export default function TradePage() {
 
           <Separator />
 
-          {/* Trigger Timer */}
+          {/* Auto Trigger */}
           <div className="space-y-3">
             <div
               style={{
@@ -421,8 +455,8 @@ export default function TradePage() {
               <div className="flex items-center justify-between mb-5 relative z-10">
                 <div className="flex items-center gap-2">
                   <Timer className="w-4 h-4" style={{ color: triggerTimerEnabled ? "var(--theme-btn-buy)" : "var(--theme-text-gray-400)" }} />
-                  <span style={{ color: "var(--theme-text-white)", fontWeight: 600, fontSize: "14px", letterSpacing: "0.3px" }}>
-                    Trigger Timer
+                  <span style={{ color: "#ccc", fontWeight: 600, fontSize: "14px", letterSpacing: "0.3px" }}>
+                    Auto Trigger
                   </span>
                   {serverTime && (
                     <span style={{ color: triggerTimerEnabled ? "#4ade80" : "var(--theme-text-gray-500)", fontSize: "11px", fontFamily: "monospace", fontWeight: 500, marginLeft: "4px" }}>
@@ -435,7 +469,7 @@ export default function TradePage() {
                   type="button"
                   onClick={() => setTriggerTimerEnabled((prev) => !prev)}
                   aria-pressed={triggerTimerEnabled}
-                  aria-label="Toggle trigger timer"
+                  aria-label="Toggle auto trigger"
                   style={{
                     width: 44,
                     height: 24,
@@ -465,148 +499,132 @@ export default function TradePage() {
               </div>
 
               {triggerTimerEnabled && (
-              <>
-              {/* Three fields horizontally */}
-              <div className="flex items-center justify-center gap-3 mb-6 relative z-10">
-                <div className="flex flex-col items-center gap-2">
-                  <NumericField
-                    value={triggerHours}
-                    onChange={setTriggerHours}
-                    className="w-14 h-10 border-none rounded-lg text-center font-bold text-lg"
-                    style={{
-                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
-                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
-                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
-                      transition: "all 0.2s ease"
-                    }}
-                    disabled={!triggerTimerEnabled}
-                  />
-                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Hrs</label>
+              <div className="space-y-4 relative z-10">
+                {/* Time Based Section */}
+                <div className="rounded-lg border border-white/5 p-3 space-y-3 bg-white/5">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="triggerTimeEnabled"
+                      checked={triggerTimeEnabled}
+                      onChange={(e) => setTriggerTimeEnabled(e.target.checked)}
+                      className="h-4 w-4 accent-green-500"
+                    />
+                    <label htmlFor="triggerTimeEnabled" className="text-xs font-bold uppercase tracking-wider" style={{ color: "#ccc" }}>Time Based</label>
+                  </div>
+
+                  <div className={`flex items-center justify-center gap-3 ${triggerTimeEnabled ? "" : "opacity-30 pointer-events-none"}`}>
+                    <div className="flex flex-col items-center gap-1">
+                      <NumericField
+                        value={triggerHours}
+                        onChange={setTriggerHours}
+                        className="w-14 h-9 border-none rounded-lg text-center font-bold text-lg"
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          color: "var(--theme-text-white)",
+                          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                        }}
+                      />
+                      <label style={{ color: "#ccc", fontSize: "9px", fontWeight: 600, textTransform: "uppercase" }}>Hrs</label>
+                    </div>
+                    <span style={{ color: "var(--theme-text-gray-600)", fontWeight: "bold", fontSize: "18px", marginTop: "-14px" }}>:</span>
+                    <div className="flex flex-col items-center gap-1">
+                      <NumericField
+                        value={triggerMinutes}
+                        onChange={setTriggerMinutes}
+                        className="w-14 h-9 border-none rounded-lg text-center font-bold text-lg"
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          color: "var(--theme-text-white)",
+                          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                        }}
+                      />
+                      <label style={{ color: "#ccc", fontSize: "9px", fontWeight: 600, textTransform: "uppercase" }}>Min</label>
+                    </div>
+                    <span style={{ color: "var(--theme-text-gray-600)", fontWeight: "bold", fontSize: "18px", marginTop: "-14px" }}>:</span>
+                    <div className="flex flex-col items-center gap-1">
+                      <NumericField
+                        value={triggerSeconds}
+                        onChange={setTriggerSeconds}
+                        className="w-14 h-9 border-none rounded-lg text-center font-bold text-lg"
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          color: "var(--theme-text-white)",
+                          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                        }}
+                      />
+                      <label style={{ color: "#ccc", fontSize: "9px", fontWeight: 600, textTransform: "uppercase" }}>Sec</label>
+                    </div>
+                  </div>
                 </div>
-                
-                <span style={{ color: "var(--theme-text-gray-600)", fontWeight: "bold", fontSize: "20px", marginTop: "-18px" }}>:</span>
 
-                <div className="flex flex-col items-center gap-2">
-                  <NumericField
-                    value={triggerMinutes}
-                    onChange={setTriggerMinutes}
-                    className="w-14 h-10 border-none rounded-lg text-center font-bold text-lg"
-                    style={{
-                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
-                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
-                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
-                      transition: "all 0.2s ease"
-                    }}
-                    disabled={!triggerTimerEnabled}
-                  />
-                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Min</label>
-                </div>
+                {/* Price Based Section */}
+                <div className="rounded-lg border border-white/5 p-3 space-y-3 bg-white/5">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="triggerPriceEnabled"
+                      checked={triggerPriceEnabled}
+                      onChange={(e) => setTriggerPriceEnabled(e.target.checked)}
+                      className="h-4 w-4 accent-green-500"
+                    />
+                    <label htmlFor="triggerPriceEnabled" className="text-xs font-bold uppercase tracking-wider" style={{ color: "#ccc" }}>Price Based</label>
+                  </div>
 
-                <span style={{ color: "var(--theme-text-gray-600)", fontWeight: "bold", fontSize: "20px", marginTop: "-18px" }}>:</span>
-
-                <div className="flex flex-col items-center gap-2">
-                  <NumericField
-                    value={triggerSeconds}
-                    onChange={setTriggerSeconds}
-                    className="w-14 h-10 border-none rounded-lg text-center font-bold text-lg"
-                    style={{
-                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
-                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
-                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
-                      transition: "all 0.2s ease"
-                    }}
-                    disabled={!triggerTimerEnabled}
-                  />
-                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Sec</label>
+                  <div className={`flex items-center justify-center gap-6 ${triggerPriceEnabled ? "" : "opacity-30 pointer-events-none"}`}>
+                    <div className="flex flex-col items-center gap-1">
+                      <NumericField
+                        value={triggerMinPrice}
+                        onChange={setTriggerMinPrice}
+                        className="w-20 h-9 border-none rounded-lg text-center font-bold text-base"
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          color: "var(--theme-text-white)",
+                          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                        }}
+                      />
+                      <label style={{ color: "#ccc", fontSize: "9px", fontWeight: 600, textTransform: "uppercase" }}>Min Price</label>
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <NumericField
+                        value={triggerMaxPrice}
+                        onChange={setTriggerMaxPrice}
+                        className="w-20 h-9 border-none rounded-lg text-center font-bold text-base"
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          color: "var(--theme-text-white)",
+                          boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                        }}
+                      />
+                      <label style={{ color: "#ccc", fontSize: "9px", fontWeight: 600, textTransform: "uppercase" }}>Max Price</label>
+                    </div>
+                  </div>
                 </div>
               </div>
+              )}
 
-              {/* Min / Max Price fields */}
-              <div className="flex items-center justify-center gap-6 mb-6 relative z-10">
-                <div className="flex flex-col items-center gap-2">
-                  <NumericField
-                    value={triggerMinPrice}
-                    onChange={setTriggerMinPrice}
-                    className="w-20 h-10 border-none rounded-lg text-center font-bold text-base"
-                    style={{
-                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
-                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
-                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
-                      transition: "all 0.2s ease"
-                    }}
-                    disabled={!triggerTimerEnabled}
-                  />
-                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Min Price</label>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <NumericField
-                    value={triggerMaxPrice}
-                    onChange={setTriggerMaxPrice}
-                    className="w-20 h-10 border-none rounded-lg text-center font-bold text-base"
-                    style={{
-                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
-                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
-                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
-                      transition: "all 0.2s ease"
-                    }}
-                    disabled={!triggerTimerEnabled}
-                  />
-                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Max Price</label>
-                </div>
-              </div>
-
-              {/* Save + Reset buttons */}
-              <div className="flex gap-3 relative z-10">
-                <button
-                  type="button"
-                  onClick={() => {
-                    console.log("Trigger Timer saved:", { triggerHours, triggerMinutes, triggerSeconds, triggerMinPrice, triggerMaxPrice, triggerTimerEnabled });
-                  }}
-                  disabled={!triggerTimerEnabled}
-                  className="flex-1"
-                  style={{
-                    padding: "8px",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: triggerTimerEnabled ? "pointer" : "not-allowed",
-                    border: "none",
-                    background: triggerTimerEnabled ? "var(--theme-btn-buy)" : "var(--theme-btn-dark)",
-                    color: "var(--theme-btn-buy-text)",
-                    opacity: triggerTimerEnabled ? 1 : 0.4,
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  Save Configuration
-                </button>
-                <button
-                  type="button"
+              {/* Reset button only - Save is handled by main button */}
+              <div className="mt-4 relative z-10 flex justify-end">
+                <Button 
                   onClick={() => {
                     setTriggerHours(9);
                     setTriggerMinutes(15);
-                    setTriggerSeconds(10);
+                    setTriggerSeconds(0);
                     setTriggerMinPrice(100);
                     setTriggerMaxPrice(400);
+                    setTriggerTimeEnabled(true);
+                    setTriggerPriceEnabled(true);
                   }}
-                  disabled={!triggerTimerEnabled}
+                  className="text-[11px] h-8 px-4 text-black uppercase tracking-wider rounded-md border border-black/10"
                   style={{
-                    padding: "8px 16px",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: triggerTimerEnabled ? "pointer" : "not-allowed",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    background: "rgba(255,255,255,0.05)",
-                    color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
+                    backgroundColor: "var(--theme-btn-danger)",
                     opacity: triggerTimerEnabled ? 1 : 0.4,
                     transition: "all 0.2s ease"
                   }}
                 >
-                  Reset
-                </button>
+                  Reset Defaults
+                </Button>
               </div>
-              </>
-              )}
             </div>
           </div>
 
@@ -1412,6 +1430,8 @@ export default function TradePage() {
                         minToHoldTrailing: minToHoldTrailing === "yes",
                         signalReEntryEnabled,
                         triggerTimerEnabled,
+                        triggerTimeEnabled,
+                        triggerPriceEnabled,
                         triggerHours,
                         triggerMinutes,
                         triggerSeconds,
@@ -1485,6 +1505,8 @@ export default function TradePage() {
                         minToHoldTrailing: minToHoldTrailing === "yes",
                         signalReEntryEnabled,
                         triggerTimerEnabled,
+                        triggerTimeEnabled,
+                        triggerPriceEnabled,
                         triggerHours,
                         triggerMinutes,
                         triggerSeconds,
