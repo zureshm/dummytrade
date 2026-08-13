@@ -53,9 +53,13 @@ export type WaitingTrade = {
   reEntryMinTargetTrailing: boolean;
   pendingSkippedBuy?: boolean;
   signalReEntryEnabled: boolean;
+  triggerTimerEnabled?: boolean;
+  triggerHours?: number;
+  triggerMinutes?: number;
+  triggerSeconds?: number;
+  triggerMinPrice?: number;
+  triggerMaxPrice?: number;
 };
-
-// active trade shown in top running-trade card after strategy triggers it
 export type ActiveTrade = {
   symbol: string;
   entryPrice: string;
@@ -118,6 +122,12 @@ export type ActiveTrade = {
   pendingSkippedBuy?: boolean;
   signalReEntryEnabled: boolean;
   signalReEntryArmed?: boolean;
+  triggerTimerEnabled?: boolean;
+  triggerHours?: number;
+  triggerMinutes?: number;
+  triggerSeconds?: number;
+  triggerMinPrice?: number;
+  triggerMaxPrice?: number;
 };
 
 export type AiSuggestion = {
@@ -277,6 +287,12 @@ function readFormNumber(symbol: string, field: string, fallback: number) {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
+function readFormNumberAllowZero(symbol: string, field: string, fallback: number) {
+  const raw = readFormField(symbol, field, fallback);
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
 function readFormBool(symbol: string, field: string, fallback: boolean) {
   const raw = readFormField(symbol, field, fallback);
   return Boolean(raw ?? fallback);
@@ -384,6 +400,12 @@ export function TradeStoreProvider({
       reEntryMinTargetTrailing: readFormBool(sym, "reEntryMinTargetTrailing", false),
       pendingSkippedBuy: false,
       signalReEntryEnabled: readFormBool(sym, "signalReEntryEnabled", true),
+      triggerTimerEnabled: readFormBool(sym, "triggerTimerEnabled", false),
+      triggerHours: readFormNumberAllowZero(sym, "triggerHours", 9),
+      triggerMinutes: readFormNumberAllowZero(sym, "triggerMinutes", 15),
+      triggerSeconds: readFormNumberAllowZero(sym, "triggerSeconds", 0),
+      triggerMinPrice: readFormNumberAllowZero(sym, "triggerMinPrice", 100),
+      triggerMaxPrice: readFormNumberAllowZero(sym, "triggerMaxPrice", 400),
     };
 
     if (alreadyExists) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { HelpCircle, ShieldAlert, Clock, Target, RefreshCw } from "lucide-react";
+import { HelpCircle, ShieldAlert, Clock, Target, RefreshCw, Timer } from "lucide-react";
 import { useTradeStore, WaitingTrade } from "../store/TradeStore";
 import { useRouter } from "next/navigation";
 import { getPrices } from "@/lib/getPrices";
@@ -163,6 +163,14 @@ export default function TradePage() {
   const [signalReEntryEnabled, setSignalReEntryEnabled] = useState(true);
   const [isSignalReEntryInfoOpen, setIsSignalReEntryInfoOpen] = useState(false);
   const [isCandleSizeInfoOpen, setIsCandleSizeInfoOpen] = useState(false);
+
+  // Trigger Timer (UI only)
+  const [triggerTimerEnabled, setTriggerTimerEnabled] = useState(false);
+  const [triggerHours, setTriggerHours] = useState(9);
+  const [triggerMinutes, setTriggerMinutes] = useState(15);
+  const [triggerSeconds, setTriggerSeconds] = useState(10);
+  const [triggerMinPrice, setTriggerMinPrice] = useState(100);
+  const [triggerMaxPrice, setTriggerMaxPrice] = useState(400);
   const [rangeEnabled, setRangeEnabled] = useState(true);
   const [timeFrom, setTimeFrom] = useState('10:00');
   const [timeFromAmpm, setTimeFromAmpm] = useState('am');
@@ -261,6 +269,12 @@ export default function TradePage() {
         setReEntryMinTargetTrigger(data.reEntryMinTargetTrigger || 2);
         setReEntryMinTargetTrailing(data.reEntryMinTargetTrailing === true ? "yes" : "no");
         setSignalReEntryEnabled(Boolean(data.signalReEntryEnabled ?? true));
+        setTriggerTimerEnabled(Boolean(data.triggerTimerEnabled ?? false));
+        setTriggerHours(data.triggerHours ?? 9);
+        setTriggerMinutes(data.triggerMinutes ?? 15);
+        setTriggerSeconds(data.triggerSeconds ?? 10);
+        setTriggerMinPrice(data.triggerMinPrice ?? 100);
+        setTriggerMaxPrice(data.triggerMaxPrice ?? 400);
       } else {
         // Reset to defaults
         setStrategy('default');
@@ -319,6 +333,12 @@ export default function TradePage() {
       reEntryMinTargetTrailing: reEntryMinTargetTrailing === "yes",
       minToHoldTrailing: minToHoldTrailing === "yes",
       signalReEntryEnabled,
+      triggerTimerEnabled,
+      triggerHours,
+      triggerMinutes,
+      triggerSeconds,
+      triggerMinPrice,
+      triggerMaxPrice,
     };
     localStorage.setItem('dummy_tradeForm_' + selection.symbol, JSON.stringify(formData));
   };
@@ -333,7 +353,7 @@ export default function TradePage() {
           
           {/* Strategy Selection */}
           <div className="space-y-2">
-            <label htmlFor="strategy" className="text-sm font-medium">Strategy Presets</label>
+            <label htmlFor="strategy" className="text-sm font-medium">Settings Presets</label>
             <select 
               id="strategy"
               value={strategy} 
@@ -366,6 +386,195 @@ export default function TradePage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <Separator />
+
+          {/* Trigger Timer */}
+          <div className="space-y-3">
+            <div
+              style={{
+                background: "var(--theme-bg)",
+                padding: "16px",
+                borderRadius: "12px",
+                border: "1px solid rgba(255,255,255,0.05)",
+                position: "relative",
+                overflow: "hidden"
+              }}
+            >
+              {/* Title row with toggle */}
+              <div className="flex items-center justify-between mb-5 relative z-10">
+                <div className="flex items-center gap-2">
+                  <Timer className="w-4 h-4" style={{ color: triggerTimerEnabled ? "var(--theme-btn-buy)" : "var(--theme-text-gray-400)" }} />
+                  <span style={{ color: "var(--theme-text-white)", fontWeight: 600, fontSize: "14px", letterSpacing: "0.3px" }}>
+                    Trigger Timer
+                  </span>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setTriggerTimerEnabled((prev) => !prev)}
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: "20px",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    border: "1px solid",
+                    borderColor: triggerTimerEnabled ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.1)",
+                    background: triggerTimerEnabled ? "rgba(34,197,94,0.15)" : "transparent",
+                    color: triggerTimerEnabled ? "#4ade80" : "var(--theme-text-gray-400)",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  {triggerTimerEnabled ? "● ACTIVE" : "○ INACTIVE"}
+                </button>
+              </div>
+
+              {triggerTimerEnabled && (
+              <>
+              {/* Three fields horizontally */}
+              <div className="flex items-center justify-center gap-3 mb-6 relative z-10">
+                <div className="flex flex-col items-center gap-2">
+                  <NumericField
+                    value={triggerHours}
+                    onChange={setTriggerHours}
+                    className="w-14 h-10 border-none rounded-lg text-center font-bold text-lg"
+                    style={{
+                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
+                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                      transition: "all 0.2s ease"
+                    }}
+                    disabled={!triggerTimerEnabled}
+                  />
+                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Hrs</label>
+                </div>
+                
+                <span style={{ color: "var(--theme-text-gray-600)", fontWeight: "bold", fontSize: "20px", marginTop: "-18px" }}>:</span>
+
+                <div className="flex flex-col items-center gap-2">
+                  <NumericField
+                    value={triggerMinutes}
+                    onChange={setTriggerMinutes}
+                    className="w-14 h-10 border-none rounded-lg text-center font-bold text-lg"
+                    style={{
+                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
+                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                      transition: "all 0.2s ease"
+                    }}
+                    disabled={!triggerTimerEnabled}
+                  />
+                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Min</label>
+                </div>
+
+                <span style={{ color: "var(--theme-text-gray-600)", fontWeight: "bold", fontSize: "20px", marginTop: "-18px" }}>:</span>
+
+                <div className="flex flex-col items-center gap-2">
+                  <NumericField
+                    value={triggerSeconds}
+                    onChange={setTriggerSeconds}
+                    className="w-14 h-10 border-none rounded-lg text-center font-bold text-lg"
+                    style={{
+                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
+                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                      transition: "all 0.2s ease"
+                    }}
+                    disabled={!triggerTimerEnabled}
+                  />
+                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Sec</label>
+                </div>
+              </div>
+
+              {/* Min / Max Price fields */}
+              <div className="flex items-center justify-center gap-6 mb-6 relative z-10">
+                <div className="flex flex-col items-center gap-2">
+                  <NumericField
+                    value={triggerMinPrice}
+                    onChange={setTriggerMinPrice}
+                    className="w-20 h-10 border-none rounded-lg text-center font-bold text-base"
+                    style={{
+                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
+                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                      transition: "all 0.2s ease"
+                    }}
+                    disabled={!triggerTimerEnabled}
+                  />
+                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Min Price</label>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <NumericField
+                    value={triggerMaxPrice}
+                    onChange={setTriggerMaxPrice}
+                    className="w-20 h-10 border-none rounded-lg text-center font-bold text-base"
+                    style={{
+                      background: triggerTimerEnabled ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
+                      color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)",
+                      transition: "all 0.2s ease"
+                    }}
+                    disabled={!triggerTimerEnabled}
+                  />
+                  <label style={{ color: "var(--theme-text-gray-500)", fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>Max Price</label>
+                </div>
+              </div>
+
+              {/* Save + Reset buttons */}
+              <div className="flex gap-3 relative z-10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    console.log("Trigger Timer saved:", { triggerHours, triggerMinutes, triggerSeconds, triggerMinPrice, triggerMaxPrice, triggerTimerEnabled });
+                  }}
+                  disabled={!triggerTimerEnabled}
+                  className="flex-1"
+                  style={{
+                    padding: "8px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: triggerTimerEnabled ? "pointer" : "not-allowed",
+                    border: "none",
+                    background: triggerTimerEnabled ? "var(--theme-btn-buy)" : "var(--theme-btn-dark)",
+                    color: "var(--theme-btn-buy-text)",
+                    opacity: triggerTimerEnabled ? 1 : 0.4,
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  Save Configuration
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTriggerHours(9);
+                    setTriggerMinutes(15);
+                    setTriggerSeconds(10);
+                    setTriggerMinPrice(100);
+                    setTriggerMaxPrice(400);
+                  }}
+                  disabled={!triggerTimerEnabled}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: triggerTimerEnabled ? "pointer" : "not-allowed",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    background: "rgba(255,255,255,0.05)",
+                    color: triggerTimerEnabled ? "var(--theme-text-white)" : "var(--theme-text-gray-600)",
+                    opacity: triggerTimerEnabled ? 1 : 0.4,
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+              </>
+              )}
+            </div>
           </div>
 
           <Separator />
@@ -1169,6 +1378,12 @@ export default function TradePage() {
                         reEntryMinTargetTrailing: reEntryMinTargetTrailing === "yes",
                         minToHoldTrailing: minToHoldTrailing === "yes",
                         signalReEntryEnabled,
+                        triggerTimerEnabled,
+                        triggerHours,
+                        triggerMinutes,
+                        triggerSeconds,
+                        triggerMinPrice,
+                        triggerMaxPrice,
                       };
                       fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(selection.symbol)}/config`, {
                         method: "PUT",
@@ -1236,6 +1451,12 @@ export default function TradePage() {
                         reEntryMinTargetTrailing: reEntryMinTargetTrailing === "yes",
                         minToHoldTrailing: minToHoldTrailing === "yes",
                         signalReEntryEnabled,
+                        triggerTimerEnabled,
+                        triggerHours,
+                        triggerMinutes,
+                        triggerSeconds,
+                        triggerMinPrice,
+                        triggerMaxPrice,
                       }),
                     }).catch(() => {});
 
