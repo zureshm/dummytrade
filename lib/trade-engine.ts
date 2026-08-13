@@ -4290,35 +4290,38 @@ async function tick() {
     }
 
     // 4. Trigger Timer check — auto-activate waiting trades at specified time if price in range
-    // Uses per-symbol candle time, ignores seconds, fires within 60s window
+    // Uses server system time (IST), fires within 60s window starting from target HH:MM:SS
+    const sysNow = new Date();
+    const sysH = sysNow.getHours();
+    const sysM = sysNow.getMinutes();
+    const sysS = sysNow.getSeconds();
+    const sysTotalSecs = sysH * 3600 + sysM * 60 + sysS;
+    const sysTimeStr = `${String(sysH).padStart(2, "0")}:${String(sysM).padStart(2, "0")}:${String(sysS).padStart(2, "0")}`;
+
     for (const trade of waitingTrades) {
       if (!trade.triggerTimerEnabled) continue;
       if (triggerTimerFired.has(trade.symbol)) continue;
 
-      const symCandleTime = lastCandleTimeMap[trade.symbol] || lastStrategyCandleTime;
-      const candleMin = toMinutes(symCandleTime);
-
       const targetH = trade.triggerHours ?? 0;
       const targetM = trade.triggerMinutes ?? 0;
-      const targetMin = targetH * 60 + targetM;
+      const targetS = trade.triggerSeconds ?? 0;
+      const targetTotalSecs = targetH * 3600 + targetM * 60 + targetS;
 
-      // Candle time must match target minute (ignores seconds)
-      if (candleMin < 0 || candleMin !== targetMin) continue;
+      // Fire when current time is within [target, target + 60] seconds
+      if (sysTotalSecs < targetTotalSecs || sysTotalSecs > targetTotalSecs + 60) continue;
 
       const minP = trade.triggerMinPrice ?? 0;
       const maxP = trade.triggerMaxPrice ?? Infinity;
 
-      // Use candle close price if available, otherwise fetch LTP
-      let ltp = lastCandleCloseMap[trade.symbol];
-      if (!Number.isFinite(ltp)) {
-        try {
-          const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(trade.symbol)}`);
-          const prices = await res.json();
-          ltp = Array.isArray(prices) && prices[0]?.ltp != null ? Number(prices[0].ltp) : NaN;
-        } catch {
-          console.log(`[trigger-timer] ${trade.symbol}: LTP fetch failed, skipping`);
-          continue;
-        }
+      // Fetch live LTP for price check
+      let ltp: number = NaN;
+      try {
+        const res = await fetch(`${API_URL}/prices?symbols=${encodeURIComponent(trade.symbol)}`);
+        const prices = await res.json();
+        ltp = Array.isArray(prices) && prices[0]?.ltp != null ? Number(prices[0].ltp) : NaN;
+      } catch {
+        console.log(`[trigger-timer] ${trade.symbol}: LTP fetch failed, skipping`);
+        continue;
       }
 
       if (!Number.isFinite(ltp)) {
@@ -4328,15 +4331,15 @@ async function tick() {
 
       if (ltp < minP || ltp > maxP) {
         console.log(`[trigger-timer] ${trade.symbol}: LTP ${ltp} outside range [${minP}, ${maxP}], skipping`);
-        addLogToWaiting(trade.symbol, `Trigger Timer: LTP ${ltp} outside range [${minP}, ${maxP}] at ${fmtTime(symCandleTime)}`);
+        addLogToWaiting(trade.symbol, `Trigger Timer: LTP ${ltp} outside range [${minP}, ${maxP}] at ${sysTimeStr}`);
         triggerTimerFired.add(trade.symbol);
         continue;
       }
 
       // Price in range — activate the trade
       console.log(`[trigger-timer] ${trade.symbol}: LTP ${ltp} in range [${minP}, ${maxP}], activating!`);
-      addLogToWaiting(trade.symbol, `Trigger Timer fired at ${fmtTime(symCandleTime)} — LTP ${ltp} in range [${minP}, ${maxP}]`);
-      activateWaitingTrade(trade.symbol, String(ltp), `Trigger Timer BUY at ₹${ltp} at ${fmtTime(symCandleTime)}`);
+      addLogToWaiting(trade.symbol, `Trigger Timer fired at ${sysTimeStr} — LTP ${ltp} in range [${minP}, ${maxP}]`);
+      activateWaitingTrade(trade.symbol, String(ltp), `Trigger Timer BUY at ₹${ltp} at ${sysTimeStr}`);
       triggerTimerFired.add(trade.symbol);
     }
 

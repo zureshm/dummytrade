@@ -171,6 +171,21 @@ export default function TradePage() {
   const [triggerSeconds, setTriggerSeconds] = useState(10);
   const [triggerMinPrice, setTriggerMinPrice] = useState(100);
   const [triggerMaxPrice, setTriggerMaxPrice] = useState(400);
+  const [serverTime, setServerTime] = useState("");
+
+  // Poll server time every second for live display
+  useEffect(() => {
+    const fetchTime = async () => {
+      try {
+        const res = await fetch(`${BASE_PATH}/api/time`);
+        const data = await res.json();
+        setServerTime(data.time);
+      } catch {}
+    };
+    fetchTime();
+    const interval = setInterval(fetchTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
   const [rangeEnabled, setRangeEnabled] = useState(true);
   const [timeFrom, setTimeFrom] = useState('10:00');
   const [timeFromAmpm, setTimeFromAmpm] = useState('am');
@@ -409,25 +424,43 @@ export default function TradePage() {
                   <span style={{ color: "var(--theme-text-white)", fontWeight: 600, fontSize: "14px", letterSpacing: "0.3px" }}>
                     Trigger Timer
                   </span>
+                  {serverTime && (
+                    <span style={{ color: triggerTimerEnabled ? "#4ade80" : "var(--theme-text-gray-500)", fontSize: "11px", fontFamily: "monospace", fontWeight: 500, marginLeft: "4px" }}>
+                      {serverTime}
+                    </span>
+                  )}
                 </div>
                 
                 <button
                   type="button"
                   onClick={() => setTriggerTimerEnabled((prev) => !prev)}
+                  aria-pressed={triggerTimerEnabled}
+                  aria-label="Toggle trigger timer"
                   style={{
-                    padding: "4px 12px",
-                    borderRadius: "20px",
-                    fontSize: "10px",
-                    fontWeight: 700,
+                    width: 44,
+                    height: 24,
+                    borderRadius: 12,
+                    background: triggerTimerEnabled ? "var(--theme-btn-buy)" : "var(--theme-text-gray-600)",
+                    position: "relative",
+                    transition: "background 0.2s",
+                    border: "none",
                     cursor: "pointer",
-                    border: "1px solid",
-                    borderColor: triggerTimerEnabled ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.1)",
-                    background: triggerTimerEnabled ? "rgba(34,197,94,0.15)" : "transparent",
-                    color: triggerTimerEnabled ? "#4ade80" : "var(--theme-text-gray-400)",
-                    transition: "all 0.2s ease"
+                    flexShrink: 0,
                   }}
                 >
-                  {triggerTimerEnabled ? "● ACTIVE" : "○ INACTIVE"}
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 3,
+                      left: triggerTimerEnabled ? 23 : 3,
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      background: "#fff",
+                      transition: "left 0.2s",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                    }}
+                  />
                 </button>
               </div>
 
