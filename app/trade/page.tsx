@@ -149,7 +149,7 @@ export default function TradePage() {
     setStrategy(newStrategy);
     applyStrategyDefaults(newStrategy);
   };
-  const [strategy, setStrategy] = useState('default');
+  const [strategy, setStrategy] = useState('autotrigger_default');
   const [numberOfTrades, setNumberOfTrades] = useState(5);
   const [stopLossNumberEnabled, setStopLossNumberEnabled] = useState(true);
   const [stopLossNumber, setStopLossNumber] = useState(15);
@@ -409,7 +409,9 @@ export default function TradePage() {
               onChange={(e) => handleStrategyChange(e.target.value)}
               className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="default">Default</option>
+              <option value="nifty_default">Nifty Default</option>
+              <option value="sensex_default">Sensex Default</option>
+              <option value="autotrigger_default">Auto Trigger Default</option>
               <option value="low">Strict Low</option>
               <option value="medium">Free Low</option>
               <option value="high">High Target</option>
