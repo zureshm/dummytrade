@@ -43,6 +43,8 @@ export type WaitingTrade = {
   reEntryAfterTargetEnabled: boolean;
   reEntryCandles: number;
   reEntryPoints: number;
+  reEntryStopLossEnabled: boolean;
+  reEntryStopLoss: number;
   reEntryAsTrailingEnabled: boolean;
   reEntryTrailingPoints: number;
   reEntryMinTargetEnabled: boolean;
@@ -51,9 +53,15 @@ export type WaitingTrade = {
   reEntryMinTargetTrailing: boolean;
   pendingSkippedBuy?: boolean;
   signalReEntryEnabled: boolean;
+  triggerTimerEnabled?: boolean;
+  triggerTimeEnabled?: boolean;
+  triggerPriceEnabled?: boolean;
+  triggerHours?: number;
+  triggerMinutes?: number;
+  triggerSeconds?: number;
+  triggerMinPrice?: number;
+  triggerMaxPrice?: number;
 };
-
-// active trade shown in top running-trade card after strategy triggers it
 export type ActiveTrade = {
   symbol: string;
   entryPrice: string;
@@ -101,6 +109,8 @@ export type ActiveTrade = {
   reEntryAfterTargetEnabled: boolean;
   reEntryCandles: number;
   reEntryPoints: number;
+  reEntryStopLossEnabled: boolean;
+  reEntryStopLoss: number;
   reEntryAsTrailingEnabled: boolean;
   reEntryTrailingPoints: number;
   reEntryMinTargetEnabled: boolean;
@@ -114,6 +124,14 @@ export type ActiveTrade = {
   pendingSkippedBuy?: boolean;
   signalReEntryEnabled: boolean;
   signalReEntryArmed?: boolean;
+  triggerTimerEnabled?: boolean;
+  triggerTimeEnabled?: boolean;
+  triggerPriceEnabled?: boolean;
+  triggerHours?: number;
+  triggerMinutes?: number;
+  triggerSeconds?: number;
+  triggerMinPrice?: number;
+  triggerMaxPrice?: number;
 };
 
 export type AiSuggestion = {
@@ -273,6 +291,12 @@ function readFormNumber(symbol: string, field: string, fallback: number) {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
+function readFormNumberAllowZero(symbol: string, field: string, fallback: number) {
+  const raw = readFormField(symbol, field, fallback);
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
 function readFormBool(symbol: string, field: string, fallback: boolean) {
   const raw = readFormField(symbol, field, fallback);
   return Boolean(raw ?? fallback);
@@ -370,6 +394,8 @@ export function TradeStoreProvider({
       reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
       reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
       reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
+      reEntryStopLossEnabled: readFormBool(sym, "reEntryStopLossEnabled", true),
+      reEntryStopLoss: readFormNumber(sym, "reEntryStopLoss", 5),
       reEntryAsTrailingEnabled: readFormBool(sym, "reEntryAsTrailingEnabled", true),
       reEntryTrailingPoints: readFormNumber(sym, "reEntryTrailingPoints", 10),
       reEntryMinTargetEnabled: readFormBool(sym, "reEntryMinTargetEnabled", false),
@@ -378,6 +404,14 @@ export function TradeStoreProvider({
       reEntryMinTargetTrailing: readFormBool(sym, "reEntryMinTargetTrailing", false),
       pendingSkippedBuy: false,
       signalReEntryEnabled: readFormBool(sym, "signalReEntryEnabled", true),
+      triggerTimerEnabled: readFormBool(sym, "triggerTimerEnabled", false),
+      triggerTimeEnabled: readFormBool(sym, "triggerTimeEnabled", true),
+      triggerPriceEnabled: readFormBool(sym, "triggerPriceEnabled", true),
+      triggerHours: readFormNumberAllowZero(sym, "triggerHours", 9),
+      triggerMinutes: readFormNumberAllowZero(sym, "triggerMinutes", 15),
+      triggerSeconds: readFormNumberAllowZero(sym, "triggerSeconds", 0),
+      triggerMinPrice: readFormNumberAllowZero(sym, "triggerMinPrice", 100),
+      triggerMaxPrice: readFormNumberAllowZero(sym, "triggerMaxPrice", 400),
     };
 
     if (alreadyExists) {
@@ -464,6 +498,8 @@ export function TradeStoreProvider({
       reEntryAfterTargetEnabled: tradeToActivate.reEntryAfterTargetEnabled,
       reEntryCandles: tradeToActivate.reEntryCandles,
       reEntryPoints: tradeToActivate.reEntryPoints,
+      reEntryStopLossEnabled: tradeToActivate.reEntryStopLossEnabled,
+      reEntryStopLoss: tradeToActivate.reEntryStopLoss,
       reEntryAsTrailingEnabled: tradeToActivate.reEntryAsTrailingEnabled,
       reEntryTrailingPoints: tradeToActivate.reEntryTrailingPoints,
       reEntryMinTargetEnabled: tradeToActivate.reEntryMinTargetEnabled,
@@ -474,6 +510,14 @@ export function TradeStoreProvider({
       pendingSkippedBuy: false,
       signalReEntryEnabled: tradeToActivate.signalReEntryEnabled,
       signalReEntryArmed: false,
+      triggerTimerEnabled: tradeToActivate.triggerTimerEnabled,
+      triggerTimeEnabled: tradeToActivate.triggerTimeEnabled,
+      triggerPriceEnabled: tradeToActivate.triggerPriceEnabled,
+      triggerHours: tradeToActivate.triggerHours,
+      triggerMinutes: tradeToActivate.triggerMinutes,
+      triggerSeconds: tradeToActivate.triggerSeconds,
+      triggerMinPrice: tradeToActivate.triggerMinPrice,
+      triggerMaxPrice: tradeToActivate.triggerMaxPrice,
     };
 
     setActiveTrades((prev) => [...prev, newActiveTrade]);

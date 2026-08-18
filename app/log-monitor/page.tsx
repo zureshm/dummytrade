@@ -12,11 +12,13 @@ interface LogSection {
   error: string | null;
   filter: string;
   filterOptions: string[];
+  dataKey?: string;
 }
 
 const FILTER_OPTIONS = ["ALL", "BUY", "SELL", "REENTER", "EXIT", "ERROR"];
 const BASIC_FILTER_OPTIONS = ["ALL", "ERROR"];
 const AI_FILTER_OPTIONS = ["ALL", "TRENDING", "SIDEWAYS", "REVERSING", "UNKNOWN", "ERROR"];
+const HISTORY_FILTER_OPTIONS = ["ALL", "READY", "FAILED", "ERROR"];
 
 function getLogColor(line: string): string {
   if (line.includes("REENTER")) return "cyan";
@@ -35,6 +37,8 @@ function matchesFilter(line: string, filter: string): boolean {
   if (filter === "SIDEWAYS") return line.includes("SIDEWAYS");
   if (filter === "REVERSING") return line.includes("REVERS") || line.includes("REVERSING");
   if (filter === "UNKNOWN") return line.includes("UNKNOWN");
+  if (filter === "READY") return line.includes("READY");
+  if (filter === "FAILED") return line.includes("FAILED") || line.includes("unreachable") || line.includes("failed");
   return line.includes(filter);
 }
 
@@ -44,6 +48,7 @@ export default function LogMonitorPage() {
     { title: "Strategy Engine", url: `${STRATEGY_URL}/logs/strategy`, logs: [], error: null, filter: "ALL", filterOptions: FILTER_OPTIONS },
     { title: "Angel Feed Server", url: `${API_URL}/logs/server`, logs: [], error: null, filter: "ALL", filterOptions: BASIC_FILTER_OPTIONS },
     { title: "Candle Builder", url: `${API_URL}/logs/candle`, logs: [], error: null, filter: "ALL", filterOptions: FILTER_OPTIONS },
+    { title: "History Fetch", url: `/dummy/api/trades`, logs: [], error: null, filter: "ALL", filterOptions: HISTORY_FILTER_OPTIONS, dataKey: "historyFetchLogs" },
   ]);
 
   const [autoScroll, setAutoScroll] = useState(true);
@@ -60,7 +65,8 @@ export default function LogMonitorPage() {
           const res = await fetch(section.url);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          return { ...section, logs: data.logs || [], error: null };
+          const logs = section.dataKey ? (data[section.dataKey] || []) : (data.logs || []);
+          return { ...section, logs, error: null };
         } catch (err: unknown) {
           return { ...section, error: err instanceof Error ? err.message : "Fetch failed" };
         }
