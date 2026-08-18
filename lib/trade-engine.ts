@@ -2658,52 +2658,24 @@ function handleStrategySignal(signal: any) {
 
 
 
-  // Auto-sell cutoff at 3:25 PM
-
-
+  // Auto-sell cutoff at 3:25 PM — use server system time, not stale candle time
 
   const AUTO_SELL_CUTOFF_MINUTES = 15 * 60 + 25;
+  const sysNow = new Date();
+  const sysMinutes = sysNow.getHours() * 60 + sysNow.getMinutes();
+  const sysTimeStr = `${String(sysNow.getHours()).padStart(2, "0")}:${String(sysNow.getMinutes()).padStart(2, "0")}`;
 
-
-
-  const candleMinutes = toMinutes(signal.lastCandleTime);
-
-
-
-
-
-
-
-  if (candleMinutes >= AUTO_SELL_CUTOFF_MINUTES && activeForSymbol && activeForSymbol.inPosition) {
-
-
+  if (sysMinutes >= AUTO_SELL_CUTOFF_MINUTES && activeForSymbol && activeForSymbol.inPosition) {
 
     completeActiveTrade(
-
-
-
       activeForSymbol.symbol,
-
-
-
       String(latestClose ?? ""),
-
-
-
-      `AUTO SELL triggered post 03:05 pm cut-off at ₹${String(latestClose ?? "")} (${fmtTime(signal.lastCandleTime)})`
-
-
-
+      `AUTO SELL triggered post 03:25 pm cut-off at ₹${String(latestClose ?? "")} (sys ${sysTimeStr})`
     );
 
-
-
-    updateLastSellCandleTime(activeForSymbol.symbol, signal.lastCandleTime ?? "15:15");
-
-
+    updateLastSellCandleTime(activeForSymbol.symbol, signal.lastCandleTime ?? "15:25");
 
     return;
-
 
 
   }

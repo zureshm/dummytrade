@@ -611,7 +611,7 @@ export default function TradePage() {
                   onClick={() => {
                     setTriggerHours(9);
                     setTriggerMinutes(15);
-                    setTriggerSeconds(0);
+                    setTriggerSeconds(10);
                     setTriggerMinPrice(100);
                     setTriggerMaxPrice(400);
                     setTriggerTimeEnabled(true);
