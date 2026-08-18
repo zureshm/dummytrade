@@ -544,7 +544,7 @@ export default function ChartPopup({ open, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="relative w-[380px] rounded-2xl p-5"
+        className="relative w-[380px] rounded-2xl flex flex-col overflow-hidden"
         style={{
           background: "var(--theme-popup-bg)",
           color: "var(--theme-popup-text)",
@@ -552,12 +552,11 @@ export default function ChartPopup({ open, onClose }: Props) {
           boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
           maxWidth: "90%",
           maxHeight: "90vh",
-          overflowY: "auto",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        {/* Header - fixed */}
+        <div className="flex items-center justify-between p-5 pb-4">
           <div className="flex items-center gap-2">
             <BarChart2 size={20} style={{ color: "var(--theme-popup-border)" }} />
             <h2 className="text-lg font-bold" style={{ color: "var(--theme-popup-text)" }}>Charts</h2>
@@ -571,6 +570,9 @@ export default function ChartPopup({ open, onClose }: Props) {
             <X size={18} />
           </button>
         </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 pb-5" style={{ scrollbarWidth: "thin" }}>
         {/* Nifty50 Live Chart */}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-1">
@@ -651,6 +653,7 @@ export default function ChartPopup({ open, onClose }: Props) {
             )}
           </>
         )}
+        </div>
       </div>
     </div>
   );
