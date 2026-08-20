@@ -17,7 +17,7 @@ interface LogSection {
 
 const FILTER_OPTIONS = ["ALL", "BUY", "SELL", "REENTER", "EXIT", "ERROR"];
 const BASIC_FILTER_OPTIONS = ["ALL", "ERROR"];
-const AI_FILTER_OPTIONS = ["ALL", "TRENDING", "SIDEWAYS", "REVERSING", "UNKNOWN", "ERROR"];
+const AI_FILTER_OPTIONS = ["ALL", "UPWARDS", "SIDEWAYS", "DOWNWARDS", "UNKNOWN", "ERROR"];
 const HISTORY_FILTER_OPTIONS = ["ALL", "READY", "FAILED", "ERROR"];
 
 function getLogColor(line: string): string {
@@ -33,9 +33,9 @@ function matchesFilter(line: string, filter: string): boolean {
   if (filter === "ALL") return true;
   if (filter === "ERROR") return line.startsWith("[ERR]") || line.includes("error") || line.includes("Error") || line.includes("ERROR");
   if (filter === "EXIT") return line.includes("exit") || line.includes("Exit") || line.includes("EXIT");
-  if (filter === "TRENDING") return line.includes("TRENDING");
+  if (filter === "UPWARDS") return line.includes("UPWARDS");
   if (filter === "SIDEWAYS") return line.includes("SIDEWAYS");
-  if (filter === "REVERSING") return line.includes("REVERS") || line.includes("REVERSING");
+  if (filter === "DOWNWARDS") return line.includes("DOWNWARDS");
   if (filter === "UNKNOWN") return line.includes("UNKNOWN");
   if (filter === "READY") return line.includes("READY");
   if (filter === "FAILED") return line.includes("FAILED") || line.includes("unreachable") || line.includes("failed");
