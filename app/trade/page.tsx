@@ -201,7 +201,7 @@ export default function TradePage() {
   const [triggerMinutes, setTriggerMinutes] = useState(15);
   const [triggerSeconds, setTriggerSeconds] = useState(10);
   const [triggerMinPrice, setTriggerMinPrice] = useState(100);
-  const [triggerMaxPrice, setTriggerMaxPrice] = useState(400);
+  const [triggerMaxPrice, setTriggerMaxPrice] = useState(800);
   const [serverTime, setServerTime] = useState("");
 
   // Poll server time every second for live display
@@ -616,7 +616,7 @@ export default function TradePage() {
                     setTriggerMinutes(15);
                     setTriggerSeconds(10);
                     setTriggerMinPrice(100);
-                    setTriggerMaxPrice(400);
+                    setTriggerMaxPrice(800);
                     setTriggerTimeEnabled(true);
                     setTriggerPriceEnabled(true);
                   }}
@@ -1364,7 +1364,7 @@ export default function TradePage() {
               <span className="text-sm font-semibold">≥ ₹85,000</span>
             </div>
 
-            <div className="p-3 bg-gray-50 rounded-lg">
+            <div data-slot="trade-summary-box" className="p-3 bg-gray-50 rounded-lg trade-summary-card">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium">
                   {selection?.symbol ?? "Select a symbol from Watchlist"}
@@ -1380,12 +1380,14 @@ export default function TradePage() {
                   value={lotValue}
                   onChange={setLotValue}
                   fallback="1"
-                  className={`w-16 h-8 text-sm ${isAlreadyActive ? "opacity-50 cursor-not-allowed" : ""}`}
+                  data-lot-input="true"
+                  data-slot="trade-lot-input"
+                  className={`w-16 h-8 text-sm trade-lot-input ${isAlreadyActive ? "opacity-50 cursor-not-allowed" : ""}`}
                   disabled={!!isAlreadyActive}
                 />
               </div>
 
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600" style={{ color: "var(--theme-text-secondary, #4b5563)" }}>
                 Total: {price.toFixed(2)} × {lotSize * lotValue} = ₹{total.toFixed(2)}
               </div>
             </div>
@@ -1523,7 +1525,9 @@ export default function TradePage() {
                     router.push("/dashboard");
                   }
                 }}
-                className="flex-1"
+                data-slot="trade-enter-btn"
+                data-enter-btn="true"
+                className="flex-1 font-bold trade-enter-btn"
                 disabled={false}
               >
                 {buttonText}
