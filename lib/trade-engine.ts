@@ -3442,17 +3442,6 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
           const reEntryThreshold = trade.reEntryExitPrice + (trade.reEntryPoints || 5);
           if (candlesSinceSell <= trade.reEntryCandles) {
             if (ltp > reEntryThreshold) {
-              // UPWARDS gate — block re-entry if upwards is false or unavailable
-              if (!lastUpwards[trade.symbol]) {
-                if (lastReEntryBlockedCandle[trade.symbol] !== lastStrategyCandleTime) {
-                  lastReEntryBlockedCandle[trade.symbol] = lastStrategyCandleTime;
-                  const upwardsReason = trade.symbol in lastUpwards
-                    ? "UPWARDS is false"
-                    : "UPWARDS is unavailable";
-                  addLogToActive(trade.symbol, `RE-ENTRY blocked — ${upwardsReason} at ${currentTime}`);
-                }
-                continue;
-              }
               // NIFTY 50 directional guard — CE requires green, PE requires red
               const { open: niftyOpen, ltp: niftyLtp } = getNiftyLive();
               if (niftyOpen > 0 && niftyLtp > 0) {
