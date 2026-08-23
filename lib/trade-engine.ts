@@ -520,7 +520,7 @@ export function setAiSymbolEnabled(symbol: string, enabled: boolean) {
   }
 }
 
-// AI Guard BUY buffer — holds BUY/REENTER signals waiting for AI trending confirmation
+// AI Guard BUY buffer — holds BUY/REENTER signals waiting for AI upwards confirmation
 // Keyed by symbol. Each entry: { signalType, bufferedCandleTime, candlesElapsed, originalSignal }
 interface PendingBuyBuffer {
   signalType: "BUY" | "REENTER";
@@ -694,7 +694,7 @@ const lastCandleHigh: Record<string, number> = {};
 
 const lastCandleLow: Record<string, number> = {};
 
-const lastTrending: Record<string, boolean> = {};
+const lastUpwards: Record<string, boolean> = {};
 
 // Grace period after BUY: use only real-time LTP (not stale candle low/high) for SL/Target checks
 const lastBuyTimestamp: Record<string, number> = {};
@@ -2436,7 +2436,7 @@ function handleStrategySignal(signal: any) {
 
     if (Number.isFinite(l)) lastCandleLow[signalSymbol] = l;
 
-    if (typeof signal.trending === "boolean") lastTrending[signalSymbol] = signal.trending;
+    if (typeof signal.trending === "boolean") lastUpwards[signalSymbol] = signal.trending;
 
   }
 
@@ -2570,9 +2570,9 @@ function handleStrategySignal(signal: any) {
         if (buffered) {
           buffered.candlesElapsed++;
           if (buffered.candlesElapsed >= AI_BUFFER_MAX_CANDLES) {
-            // Buffer expired — AI never confirmed trending within 5 candles
+            // Buffer expired — AI never confirmed upwards within 5 candles
             delete pendingBuyBuffer[signalSymbol];
-            const expireLog = `BUY buffer expired after ${AI_BUFFER_MAX_CANDLES} candles — AI never confirmed trending at ${now}`;
+            const expireLog = `BUY buffer expired after ${AI_BUFFER_MAX_CANDLES} candles — AI never confirmed upwards at ${now}`;
             if (waitingTrades.find((t) => t.symbol === signalSymbol)) { addLogToWaiting(signalSymbol, expireLog); }
             else if (activeTrades.find((t) => t.symbol === signalSymbol)) { addLogToActive(signalSymbol, expireLog); }
             addAiLog(`[ai-guard] BUY buffer expired for ${signalSymbol} after ${AI_BUFFER_MAX_CANDLES} candles`);
@@ -2586,12 +2586,12 @@ function handleStrategySignal(signal: any) {
 
         addAiLog(`[ai-guard] Entry blocked for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
       } else if (settings.entryGuardEnabled && !result.blockEntry) {
-        // AI says trending — if there's a buffered BUY, fire it now
+        // AI says upwards — if there's a buffered BUY, fire it now
         const buffered = pendingBuyBuffer[signalSymbol];
         if (buffered) {
           const currentClose = lastCandleCloseMap[signalSymbol];
           const entryPrice = String(currentClose ?? latestClose ?? "");
-          const fireLog = `BUY fired from buffer at ₹${entryPrice} — AI confirmed trending (${result.marketRegime}, ${result.confidence}%) after ${buffered.candlesElapsed} candle(s) at ${now}`;
+          const fireLog = `BUY fired from buffer at ₹${entryPrice} — AI confirmed upwards (${result.marketRegime}, ${result.confidence}%) after ${buffered.candlesElapsed} candle(s) at ${now}`;
           const matchingTrade = waitingTrades.find((t) => t.symbol === signalSymbol);
           const activeTrade2 = activeTrades.find((t) => t.symbol === signalSymbol && t.status === "ACTIVE");
           if (matchingTrade) {
@@ -2601,15 +2601,15 @@ function handleStrategySignal(signal: any) {
           }
           delete pendingBuyBuffer[signalSymbol];
           setPendingSkippedBuy(signalSymbol, false);
-          addAiLog(`[ai-guard] Buffered BUY fired for ${signalSymbol}: trending confirmed after ${buffered.candlesElapsed} candle(s)`);
+          addAiLog(`[ai-guard] Buffered BUY fired for ${signalSymbol}: upwards confirmed after ${buffered.candlesElapsed} candle(s)`);
         }
       }
 
-      // Clear sideways retry if AI now says trending
-      if (!result.suggestExit || result.marketRegime === "TRENDING") {
+      // Clear sideways retry if AI now says upwards
+      if (!result.suggestExit || result.marketRegime === "UPWARDS") {
         if (pendingSidewaysExits[signalSymbol]) {
-          addLogToActive(signalSymbol, `AI now confirms TRENDING — sideways exit cancelled at ${now}`);
-          addAiLog(`[ai-guard] ${signalSymbol} returned to TRENDING, clearing sideways retry`);
+          addLogToActive(signalSymbol, `AI now confirms UPWARDS — sideways exit cancelled at ${now}`);
+          addAiLog(`[ai-guard] ${signalSymbol} returned to UPWARDS, clearing sideways retry`);
           delete pendingSidewaysExits[signalSymbol];
         }
       }
@@ -3140,14 +3140,14 @@ function handleStrategySignal(signal: any) {
     const aiResult = lastAiResult[signalSymbol];
     const aiSettings = getAiGuardSettings();
     if (aiSettings.entryGuardEnabled && aiResult && aiResult.blockEntry) {
-      // Buffer the BUY instead of permanently blocking — wait up to 5 candles for trending
+      // Buffer the BUY instead of permanently blocking — wait up to 5 candles for upwards
       pendingBuyBuffer[signalSymbol] = {
         signalType: "BUY",
         bufferedCandleTime: candleTime ?? "",
         candlesElapsed: 0,
         originalSignal: signal,
       };
-      const blockedLog = `BUY buffered by AI Guard — ${aiResult.reason} (${aiResult.confidence}%) at ${fmtTime(signal.lastCandleTime)} (waiting for trending, up to ${AI_BUFFER_MAX_CANDLES} candles)`;
+      const blockedLog = `BUY buffered by AI Guard — ${aiResult.reason} (${aiResult.confidence}%) at ${fmtTime(signal.lastCandleTime)} (waiting for upwards, up to ${AI_BUFFER_MAX_CANDLES} candles)`;
       if (matchingTrade) { addLogToWaiting(matchingTrade.symbol, blockedLog); }
       else if (activeForSymbol && !activeForSymbol.inPosition) { addLogToActive(activeForSymbol.symbol, blockedLog); }
       addAiLog(`[ai-guard] BUY buffered for ${signalSymbol}: ${aiResult.reason} (${aiResult.confidence}%)`);
@@ -3270,7 +3270,7 @@ function handleStrategySignal(signal: any) {
         candlesElapsed: 0,
         originalSignal: signal,
       };
-      const blockedLog = `REENTER buffered by AI Guard — ${reAiResult.reason} (${reAiResult.confidence}%) at ${fmtTime(signal.lastCandleTime)} (waiting for trending, up to ${AI_BUFFER_MAX_CANDLES} candles)`;
+      const blockedLog = `REENTER buffered by AI Guard — ${reAiResult.reason} (${reAiResult.confidence}%) at ${fmtTime(signal.lastCandleTime)} (waiting for upwards, up to ${AI_BUFFER_MAX_CANDLES} candles)`;
       if (waitingTrades.find((t) => t.symbol === signalSymbol)) { addLogToWaiting(signalSymbol, blockedLog); }
       else { addLogToActive(signalSymbol, blockedLog); }
       addAiLog(`[ai-guard] REENTER buffered for ${signalSymbol}: ${reAiResult.reason} (${reAiResult.confidence}%)`);
@@ -3442,17 +3442,6 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
           const reEntryThreshold = trade.reEntryExitPrice + (trade.reEntryPoints || 5);
           if (candlesSinceSell <= trade.reEntryCandles) {
             if (ltp > reEntryThreshold) {
-              // TRENDING gate — block re-entry if trending is false or unavailable
-              if (!lastTrending[trade.symbol]) {
-                if (lastReEntryBlockedCandle[trade.symbol] !== lastStrategyCandleTime) {
-                  lastReEntryBlockedCandle[trade.symbol] = lastStrategyCandleTime;
-                  const trendingReason = trade.symbol in lastTrending
-                    ? "TRENDING is false"
-                    : "TRENDING is unavailable";
-                  addLogToActive(trade.symbol, `RE-ENTRY blocked — ${trendingReason} at ${currentTime}`);
-                }
-                continue;
-              }
               // NIFTY 50 directional guard — CE requires green, PE requires red
               const { open: niftyOpen, ltp: niftyLtp } = getNiftyLive();
               if (niftyOpen > 0 && niftyLtp > 0) {
@@ -4079,9 +4068,9 @@ async function tick() {
                 dismissed: false,
               });
 
-              if (!result.suggestExit || result.marketRegime === "TRENDING") {
-                addLogToActive(symbol, `AI now confirms TRENDING — sideways exit cancelled at ${timeStr}`);
-                addAiLog(`[ai-guard] ${symbol} returned to TRENDING during retry, clearing sideways retry`);
+              if (!result.suggestExit || result.marketRegime === "UPWARDS") {
+                addLogToActive(symbol, `AI now confirms UPWARDS — sideways exit cancelled at ${timeStr}`);
+                addAiLog(`[ai-guard] ${symbol} returned to UPWARDS during retry, clearing sideways retry`);
                 delete pendingSidewaysExits[symbol];
               } else if (retry.retryCount >= 3) {
                 if (settings.autoExitEnabled) {

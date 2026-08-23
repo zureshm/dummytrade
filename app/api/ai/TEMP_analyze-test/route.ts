@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     const res = await fetch(config.url, {
       method: "POST",
       headers: config.headers(effectiveApiKey),
-      body: JSON.stringify(config.buildBody(systemPrompt, userPrompt, 200)),
+      body: JSON.stringify(config.buildBody(systemPrompt, userPrompt, 1024)),
       signal: controller.signal,
     });
 

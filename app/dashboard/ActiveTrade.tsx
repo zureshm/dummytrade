@@ -122,8 +122,8 @@ export default function ActiveTrade({
     const ru = r.regime.toUpperCase();
     if (ru === "UNKNOWN") return <span style={{ marginLeft, background: "#f59e0b", color: "#fff", fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4 }}>ERROR</span>;
     let label = "SIDEWAYS", color = "#a855f7";
-    if (ru.includes("TREND") || ru.includes("UP") || ru.includes("BULL")) { label = "TRENDING"; color = "#22c55e"; }
-    else if (ru.includes("REVERS") || ru.includes("DOWN") || ru.includes("BEAR")) { label = "DOWNWARD"; color = "#ef4444"; }
+    if (ru.includes("UP") || ru.includes("BULL")) { label = "UPWARDS"; color = "#22c55e"; }
+    else if (ru.includes("DOWN") || ru.includes("BEAR")) { label = "DOWNWARDS"; color = "#ef4444"; }
     return <span style={{ marginLeft, background: color, color: "#fff", fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4 }}>{label}</span>;
   };
 
@@ -315,11 +315,11 @@ export default function ActiveTrade({
                 const ru = suggestion.marketRegime.toUpperCase();
                 let themeColor = "#a855f7"; // SIDEWAYS (Purple)
                 let label = "AI suggests CAUTION (Sideways)";
-                if (ru.includes("TREND") || ru.includes("UP") || ru.includes("BULL")) {
-                  themeColor = "#22c55e"; // TRENDING (Green)
-                  label = "AI confirms TRENDING";
-                } else if (ru.includes("REVERS") || ru.includes("DOWN") || ru.includes("BEAR")) {
-                  themeColor = "#ef4444"; // REVERSING (Red)
+                if (ru.includes("UP") || ru.includes("BULL")) {
+                  themeColor = "#22c55e"; // UPWARDS (Green)
+                  label = "AI confirms UPWARDS";
+                } else if (ru.includes("DOWN") || ru.includes("BEAR")) {
+                  themeColor = "#ef4444"; // DOWNWARDS (Red)
                   label = "AI suggests ending cycle";
                 }
 
@@ -707,12 +707,12 @@ export default function ActiveTrade({
                   const ru = suggestion.marketRegime.toUpperCase();
                   let themeColor = "#a855f7"; // SIDEWAYS (Purple)
                   let label = "AI blocked entry (Sideways)";
-                  if (ru.includes("TREND") || ru.includes("UP") || ru.includes("BULL")) {
-                    themeColor = "#22c55e"; // TRENDING (Green)
-                    label = "AI confirms TRENDING";
-                  } else if (ru.includes("REVERS") || ru.includes("DOWN") || ru.includes("BEAR")) {
-                    themeColor = "#ef4444"; // REVERSING (Red)
-                    label = "AI blocked entry (Reversal)";
+                  if (ru.includes("UP") || ru.includes("BULL")) {
+                    themeColor = "#22c55e"; // UPWARDS (Green)
+                    label = "AI confirms UPWARDS";
+                  } else if (ru.includes("DOWN") || ru.includes("BEAR")) {
+                    themeColor = "#ef4444"; // DOWNWARDS (Red)
+                    label = "AI blocked entry (Downwards)";
                   }
 
                   return (
