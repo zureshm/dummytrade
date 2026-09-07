@@ -17,6 +17,8 @@ export type WaitingTrade = {
   numberOfTrades: number;
   stopLossNumberEnabled: boolean;
   stopLossNumber: number;
+  trailingStopLossEnabled: boolean;
+  trailingStopLossSteps: number;
   targetPointsEnabled: boolean;
   targetPoints: number;
   targetMode: "live" | "candleClose";
@@ -41,6 +43,7 @@ export type WaitingTrade = {
   maxProfit: number;
   maxLoss: number;
   reEntryAfterTargetEnabled: boolean;
+  reEntryStartCandle: number;
   reEntryCandles: number;
   reEntryPoints: number;
   reEntryStopLossEnabled: boolean;
@@ -72,6 +75,8 @@ export type ActiveTrade = {
   numberOfTrades: number;
   stopLossNumberEnabled: boolean;
   stopLossNumber: number;
+  trailingStopLossEnabled: boolean;
+  trailingStopLossSteps: number;
   targetPointsEnabled: boolean;
   targetPoints: number;
   targetMode: "live" | "candleClose";
@@ -84,6 +89,7 @@ export type ActiveTrade = {
   trailingMode: "live" | "candleClose";
   trailingTrailActive: boolean;
   trailingHighWatermark?: number;
+  trailingSlHighWatermark?: number;
   minTargetHighWatermark?: number;
   minTargetLockedPrice?: number;
   rangeEnabled: boolean;
@@ -107,6 +113,7 @@ export type ActiveTrade = {
   maxProfit: number;
   maxLoss: number;
   reEntryAfterTargetEnabled: boolean;
+  reEntryStartCandle: number;
   reEntryCandles: number;
   reEntryPoints: number;
   reEntryStopLossEnabled: boolean;
@@ -154,6 +161,8 @@ export type TradeHistoryItem = {
     numberOfTrades: number;
     stopLossNumber?: number;
     stopLossNumberEnabled: boolean;
+    trailingStopLossEnabled?: boolean;
+    trailingStopLossSteps?: number;
     targetPoints?: number;
     targetPointsEnabled: boolean;
     targetMode?: "live" | "candleClose";
@@ -170,6 +179,8 @@ type TradeConfigSnapshotSource = {
   numberOfTrades: number;
   stopLossNumberEnabled: boolean;
   stopLossNumber: number;
+  trailingStopLossEnabled: boolean;
+  trailingStopLossSteps: number;
   targetPointsEnabled: boolean;
   targetPoints: number;
   targetMode: "live" | "candleClose";
@@ -187,6 +198,8 @@ const buildTradeConfigSnapshot = (
   numberOfTrades: trade.numberOfTrades,
   stopLossNumberEnabled: Boolean(trade.stopLossNumberEnabled),
   stopLossNumber: trade.stopLossNumberEnabled ? trade.stopLossNumber : undefined,
+  trailingStopLossEnabled: Boolean(trade.trailingStopLossEnabled),
+  trailingStopLossSteps: trade.trailingStopLossEnabled ? trade.trailingStopLossSteps : undefined,
   targetPointsEnabled: Boolean(trade.targetPointsEnabled),
   targetPoints: trade.targetPointsEnabled ? trade.targetPoints : undefined,
   targetMode: trade.targetPointsEnabled ? trade.targetMode : undefined,
@@ -357,6 +370,8 @@ export function TradeStoreProvider({
       numberOfTrades: readFormNumber(sym, "numberOfTrades", 3),
       stopLossNumberEnabled: readFormBool(sym, "stopLossNumberEnabled", true),
       stopLossNumber: readFormNumber(sym, "stopLossNumber", 15),
+      trailingStopLossEnabled: readFormBool(sym, "trailingStopLossEnabled", false),
+      trailingStopLossSteps: readFormNumber(sym, "trailingStopLossSteps", 5),
       targetPointsEnabled: readFormBool(sym, "targetPointsEnabled", true),
       targetPoints: readFormNumber(sym, "targetPoints", 20),
       targetMode: readFormString(sym, "targetMode", "live") as "live" | "candleClose",
@@ -392,6 +407,7 @@ export function TradeStoreProvider({
       maxProfit: readFormNumber(sym, "maxProfit", 1100),
       maxLoss: readFormNumber(sym, "maxLoss", 900),
       reEntryAfterTargetEnabled: readFormBool(sym, "reEntryAfterTargetEnabled", false),
+      reEntryStartCandle: readFormNumber(sym, "reEntryStartCandle", 1),
       reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
       reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
       reEntryStopLossEnabled: readFormBool(sym, "reEntryStopLossEnabled", true),
@@ -461,6 +477,8 @@ export function TradeStoreProvider({
       numberOfTrades: tradeToActivate.numberOfTrades,
       stopLossNumberEnabled: tradeToActivate.stopLossNumberEnabled,
       stopLossNumber: tradeToActivate.stopLossNumber,
+      trailingStopLossEnabled: tradeToActivate.trailingStopLossEnabled,
+      trailingStopLossSteps: tradeToActivate.trailingStopLossSteps,
       targetPointsEnabled: tradeToActivate.targetPointsEnabled,
       targetPoints: tradeToActivate.targetPoints,
       targetMode: tradeToActivate.targetMode,
@@ -473,6 +491,7 @@ export function TradeStoreProvider({
       trailingMode: tradeToActivate.trailingMode,
       trailingTrailActive: false,
       trailingHighWatermark: undefined,
+      trailingSlHighWatermark: Number(entryPrice),
       minTargetHighWatermark: undefined,
       minTargetLockedPrice: undefined,
       rangeEnabled: tradeToActivate.rangeEnabled,
@@ -496,6 +515,7 @@ export function TradeStoreProvider({
       maxProfit: tradeToActivate.maxProfit,
       maxLoss: tradeToActivate.maxLoss,
       reEntryAfterTargetEnabled: tradeToActivate.reEntryAfterTargetEnabled,
+      reEntryStartCandle: tradeToActivate.reEntryStartCandle ?? 1,
       reEntryCandles: tradeToActivate.reEntryCandles,
       reEntryPoints: tradeToActivate.reEntryPoints,
       reEntryStopLossEnabled: tradeToActivate.reEntryStopLossEnabled,
@@ -571,6 +591,7 @@ export function TradeStoreProvider({
             status: "COMPLETED" as const,
             trailingTrailActive: false,
             trailingHighWatermark: undefined,
+            trailingSlHighWatermark: undefined,
           };
         }
 
@@ -587,6 +608,7 @@ export function TradeStoreProvider({
           ],
           trailingTrailActive: false,
           trailingHighWatermark: undefined,
+          trailingSlHighWatermark: undefined,
         };
       });
       return next;
@@ -640,6 +662,7 @@ export function TradeStoreProvider({
             status: "COMPLETED" as const,
             trailingTrailActive: false,
             trailingHighWatermark: undefined,
+            trailingSlHighWatermark: undefined,
           };
         }
 
@@ -656,6 +679,7 @@ export function TradeStoreProvider({
           ],
           trailingTrailActive: false,
           trailingHighWatermark: undefined,
+          trailingSlHighWatermark: undefined,
         };
       });
       return next;
@@ -679,6 +703,7 @@ export function TradeStoreProvider({
           logs: [...trade.logs, logLine],
           trailingTrailActive: false,
           trailingHighWatermark: undefined,
+          trailingSlHighWatermark: Number(entryPrice),
         };
       });
       return next;
