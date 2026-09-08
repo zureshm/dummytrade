@@ -671,7 +671,7 @@ export default function TradePage() {
                     id="stopLossNumber"
                     value={stopLossNumber}
                     onChange={setStopLossNumber}
-                    className="w-20 h-8"
+                    className="w-20 h-8 text-sm"
                     disabled={!stopLossNumberEnabled && !stopLossPercentageEnabled}
                     readOnly={stopLossPercentageEnabled}
                   />
@@ -697,7 +697,7 @@ export default function TradePage() {
                     id="trailingStopLossSteps"
                     value={trailingStopLossSteps}
                     onChange={setTrailingStopLossSteps}
-                    className="w-20 h-8"
+                    className="w-20 h-8 text-sm"
                     disabled={!trailingStopLossEnabled}
                   />
                 </div>
@@ -721,7 +721,7 @@ export default function TradePage() {
                     id="stopLossPercentageValue"
                     value={stopLossPercentage}
                     onChange={setStopLossPercentage}
-                    className="w-20 h-8"
+                    className="w-20 h-8 text-sm"
                     disabled={!stopLossPercentageEnabled}
                   />
                 </div>
@@ -770,7 +770,7 @@ export default function TradePage() {
                 <NumericField
                   value={buyOverrideSize}
                   onChange={setBuyOverrideSize}
-                  className="w-16 border rounded px-2 py-1 text-sm"
+                  className="w-16 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
               
@@ -786,7 +786,7 @@ export default function TradePage() {
                 <NumericField
                   value={waitAfterSellCandles}
                   onChange={setWaitAfterSellCandles}
-                  className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 ml-2"
+                  className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 ml-2 text-sm"
                   min="1"
                   max="99"
                   disabled={!waitAfterSellEnabled}
@@ -806,7 +806,7 @@ export default function TradePage() {
                 <NumericField
                   value={sellWhenLossCandles}
                   onChange={setSellWhenLossCandles}
-                  className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 ml-2"
+                  className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 ml-2 text-sm"
                   min="1"
                   max="99"
                   disabled={!sellWhenLossCandlesEnabled}
@@ -841,7 +841,7 @@ export default function TradePage() {
                     id="targetPoints"
                     value={targetPoints}
                     onChange={setTargetPoints}
-                    className="w-20 h-8"
+                    className="w-20 h-8 text-sm"
                     disabled={!targetPointsEnabled}
                   />
                 </div>
@@ -938,7 +938,7 @@ export default function TradePage() {
                     id="trailingAfterTargetValue"
                     value={trailingAfterTarget}
                     onChange={setTrailingAfterTarget}
-                    className="w-20 h-8"
+                    className="w-20 h-8 text-sm"
                     disabled={!trailingAfterTargetEnabled}
                   />
                 </div>
@@ -988,7 +988,7 @@ export default function TradePage() {
                     id="minToHoldValue"
                     value={minToHold}
                     onChange={setMinToHold}
-                    className="w-20 h-8"
+                    className="w-20 h-8 text-sm"
                     disabled={!minToHoldEnabled}
                   />
                   <label htmlFor="minToHoldTrigger" className={`text-sm ${minToHoldEnabled ? "" : "text-gray-400"}`}>Trigger @</label>
@@ -996,7 +996,7 @@ export default function TradePage() {
                     id="minToHoldTrigger"
                     value={minToHoldTrigger}
                     onChange={setMinToHoldTrigger}
-                    className="w-16 h-8"
+                    className="w-16 h-8 text-sm"
                     disabled={!minToHoldEnabled}
                   />
                 </div>
@@ -1078,7 +1078,7 @@ export default function TradePage() {
                   <NumericField
                     value={reEntryPoints}
                     onChange={setReEntryPoints}
-                    className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm"
                     min="1"
                     max="99"
                     disabled={!reEntryAfterTargetEnabled}
@@ -1091,7 +1091,7 @@ export default function TradePage() {
                   <NumericField
                     value={reEntryStartCandle}
                     onChange={setReEntryStartCandle}
-                    className="w-8 h-8 px-1 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-8 h-8 px-1 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm text-center"
                     min="0"
                     max="99"
                     disabled={!reEntryAfterTargetEnabled}
@@ -1100,7 +1100,7 @@ export default function TradePage() {
                   <NumericField
                     value={reEntryCandles}
                     onChange={setReEntryCandles}
-                    className="w-8 h-8 px-1 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-8 h-8 px-1 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm text-center"
                     min="1"
                     max="99"
                     disabled={!reEntryAfterTargetEnabled}
@@ -1163,7 +1163,7 @@ export default function TradePage() {
                       <NumericField
                         value={reEntryStopLoss}
                         onChange={setReEntryStopLoss}
-                        className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                        className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm"
                         min="1"
                         max="99"
                         disabled={!isReEntryActive || !reEntryStopLossEnabled}
@@ -1218,7 +1218,7 @@ export default function TradePage() {
                       <NumericField
                         value={reEntryTrailingPoints}
                         onChange={setReEntryTrailingPoints}
-                        className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                        className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm"
                         min="1"
                         max="99"
                         disabled={!isReEntryActive || !reEntryAsTrailingEnabled}
@@ -1279,7 +1279,7 @@ export default function TradePage() {
                         id="reEntryMinTargetPoints"
                         value={reEntryMinTargetPoints}
                         onChange={setReEntryMinTargetPoints}
-                        className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                        className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm"
                         min="1"
                         max="99"
                         disabled={!isReEntryActive || !reEntryMinTargetEnabled}
@@ -1289,7 +1289,7 @@ export default function TradePage() {
                         id="reEntryMinTargetTrigger"
                         value={reEntryMinTargetTrigger}
                         onChange={setReEntryMinTargetTrigger}
-                        className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                        className="w-14 h-8 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm"
                         min="1"
                         max="99"
                         disabled={!isReEntryActive || !reEntryMinTargetEnabled}
