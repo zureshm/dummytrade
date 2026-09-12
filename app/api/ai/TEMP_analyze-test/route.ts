@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAiGuardSettings, buildCompactCandles, buildMarketMetrics, buildSystemPrompt, buildSystemPromptWithVolume, getProviderConfig } from "@/lib/ai-guard";
+import { getAiGuardSettings, buildCompactCandles, buildMarketMetrics, buildSystemPrompt, buildSystemPromptWithVolume, getProviderConfig, analyzeMarketRegimeLocal } from "@/lib/ai-guard";
 
 // POST /api/ai/TEMP_analyze-test — parse pasted CSV candle data, build prompt, call Groq
 export async function POST(request: Request) {
@@ -49,6 +49,27 @@ export async function POST(request: Request) {
 
     const candleCount = settings.candlesCount || 120;
     const displaySymbol = symbol || "TEST_SYMBOL";
+
+    // Local rule engine — no API key or fetch needed
+    if (provider === "local") {
+      const result = analyzeMarketRegimeLocal(displaySymbol, candles);
+      return NextResponse.json({
+        candleCount: candles.length,
+        usedCount: Math.min(candles.length, candleCount),
+        parsed: {
+          marketRegime: result.marketRegime,
+          blockEntry: result.blockEntry,
+          suggestExit: result.suggestExit,
+          confidence: result.confidence,
+          reason: result.reason,
+          rangeHigh: result.rangeHigh,
+          rangeLow: result.rangeLow,
+        },
+        ruleBreakdown: result.ruleBreakdown || [],
+        model: "Local Rule Engine",
+      });
+    }
+
     const useVolume = settings.considerVolume || false;
     const useHA = settings.useHeikinAshi !== false;
 
