@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getAiGuardSettings, buildCompactCandles, buildMarketMetrics, buildSystemPrompt, buildSystemPromptWithVolume, getProviderConfig } from "@/lib/ai-guard";
+import { getAiGuardSettings, buildCompactCandles, buildMarketMetrics, buildSystemPrompt, buildSystemPromptWithVolume, getProviderConfig, analyzeMarketRegimeLocal, analyzeMarketRegimeLocalV2 } from "@/lib/ai-guard";
 
-// POST /api/ai/TEMP_analyze-test — parse pasted CSV candle data, build prompt, call Groq
+// POST /api/ai/TEMP_analyze-test — parse pasted CSV candle data, build prompt, call Groq/Claude or run local engine
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -15,9 +15,10 @@ export async function POST(request: Request) {
     const bodyKeys = String(body.apiKey || "").split("\n").map((k: string) => k.trim()).filter(Boolean);
     const effectiveApiKey = bodyKeys[0] || settings.apiKeys?.[0] || "";
     const provider = settings.provider || "groq";
-    const config = getProviderConfig(provider);
-    if (!effectiveApiKey) {
-      return NextResponse.json({ error: `No API key configured. Set your ${config.providerName} API key in AI Guard settings first.` }, { status: 400 });
+
+    if (provider !== "local" && provider !== "local_v2" && !effectiveApiKey) {
+      const providerConfig = getProviderConfig(provider);
+      return NextResponse.json({ error: `No API key configured. Set your ${providerConfig.providerName} API key in AI Guard settings first.` }, { status: 400 });
     }
 
     // Parse CSV lines: time,open,high,low,close[,volume]
@@ -49,8 +50,50 @@ export async function POST(request: Request) {
 
     const candleCount = settings.candlesCount || 120;
     const displaySymbol = symbol || "TEST_SYMBOL";
+
+    // Local rule engine V1 — no API key or fetch needed
+    if (provider === "local") {
+      const result = analyzeMarketRegimeLocal(displaySymbol, candles);
+      return NextResponse.json({
+        candleCount: candles.length,
+        usedCount: Math.min(candles.length, candleCount),
+        parsed: {
+          marketRegime: result.marketRegime,
+          blockEntry: result.blockEntry,
+          suggestExit: result.suggestExit,
+          confidence: result.confidence,
+          reason: result.reason,
+          rangeHigh: result.rangeHigh,
+          rangeLow: result.rangeLow,
+        },
+        ruleBreakdown: result.ruleBreakdown || [],
+        model: "Local Rule Engine V1",
+      });
+    }
+
+    // Local rule engine V2 (Choppy & Spike Guard) — no API key or fetch needed
+    if (provider === "local_v2") {
+      const result = analyzeMarketRegimeLocalV2(displaySymbol, candles);
+      return NextResponse.json({
+        candleCount: candles.length,
+        usedCount: Math.min(candles.length, candleCount),
+        parsed: {
+          marketRegime: result.marketRegime,
+          blockEntry: result.blockEntry,
+          suggestExit: result.suggestExit,
+          confidence: result.confidence,
+          reason: result.reason,
+          rangeHigh: result.rangeHigh,
+          rangeLow: result.rangeLow,
+        },
+        ruleBreakdown: result.ruleBreakdown || [],
+        model: "Local V2 (Choppy & Spike Guard)",
+      });
+    }
+
     const useVolume = settings.considerVolume || false;
     const useHA = settings.useHeikinAshi !== false;
+    const config = getProviderConfig(provider);
 
     // Build the same prompt structure as production
     const metrics = buildMarketMetrics(candles, candleCount, settings.recentCandlesCount || 30, useVolume, useHA);
