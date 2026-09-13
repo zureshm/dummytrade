@@ -504,7 +504,8 @@ const triggerTimerFired: Set<string> = new Set();
 const aiSuggestions: AiSuggestion[] = [];
 const lastAiCandleTime: Record<string, string> = {};
 const lastAiResult: Record<string, AiAnalysisResult> = {};
-const pendingSidewaysExits: Record<string, { retryCount: number; lastRetryTime: number }> = {};
+// Tracks the candle time when SIDEWAYS was first detected — exit only after 2nd consecutive sideways candle
+const pendingSidewaysExits: Record<string, string> = {};
 export function clearAiResults() {
   for (const k of Object.keys(lastAiResult)) delete lastAiResult[k];
   for (const k of Object.keys(pendingSidewaysExits)) delete pendingSidewaysExits[k];
@@ -2678,47 +2679,51 @@ function handleStrategySignal(signal: any) {
         }
       }
 
-      // Clear sideways retry if AI now says upwards
-      if (!result.suggestExit || result.marketRegime === "UPWARDS") {
-        if (pendingSidewaysExits[signalSymbol]) {
-          addLogToActive(signalSymbol, `AI now confirms UPWARDS — sideways exit cancelled at ${now}`);
-          addAiLog(`[ai-guard] ${signalSymbol} returned to UPWARDS, clearing sideways retry`);
-          delete pendingSidewaysExits[signalSymbol];
-        }
-      }
-
       // Exit Guard — suggest or auto-execute exit
       // Re-fetch current trade — it may have completed during the async AI call
       const currentTrade = activeTrades.find((t) => t.symbol === signalSymbol && t.status === "ACTIVE");
       if (result.suggestExit && currentTrade && currentTrade.inPosition) {
         if (settings.autoExitEnabled) {
-          // If sideways, start or continue the 30s retry window
+          // SIDEWAYS requires 2-candle confirmation before exiting; DOWNWARDS/REVERSING exit immediately
           if (result.marketRegime === "SIDEWAYS") {
             if (!pendingSidewaysExits[signalSymbol]) {
-              pendingSidewaysExits[signalSymbol] = { retryCount: 0, lastRetryTime: Date.now() };
-              const sideLog = `AI detected SIDEWAYS — waiting 30s with 10s retries before auto-exit at ${now}`;
-              addLogToActive(signalSymbol, sideLog);
-              addAiLog(`[ai-guard] Sideways detected for ${signalSymbol}, starting 30s retry window`);
-              return; // Don't exit yet
+              // First sideways candle — wait for confirmation
+              pendingSidewaysExits[signalSymbol] = candleTime;
+              addLogToActive(signalSymbol, `AI detected SIDEWAYS — waiting for 2nd candle confirmation at ${now}`);
+              addAiLog(`[ai-guard] Sideways detected for ${signalSymbol}, waiting for 2nd candle confirmation`);
             } else {
-              // Already in retry window, wait for tick to handle it
-              return;
+              // 2nd consecutive sideways candle — exit now
+              completeCycleWithoutExit(
+                currentTrade.symbol,
+                String(latestClose ?? ""),
+                `AI Guard auto-exit: Sideways confirmed over 2 candles (${result.reason}, ${result.confidence}%) at ${now}`
+              );
+              updateLastSellCandleTime(currentTrade.symbol, signal.lastCandleTime ?? "");
+              addAiLog(`[ai-guard] Auto-exit executed for ${signalSymbol}: sideways confirmed (${result.reason}, ${result.confidence}%)`);
+              delete pendingSidewaysExits[signalSymbol];
             }
+          } else {
+            // DOWNWARDS / REVERSING — exit immediately
+            completeCycleWithoutExit(
+              currentTrade.symbol,
+              String(latestClose ?? ""),
+              `AI Guard auto-exit: ${result.reason} (${result.confidence}%) at ${now}`
+            );
+            updateLastSellCandleTime(currentTrade.symbol, signal.lastCandleTime ?? "");
+            addAiLog(`[ai-guard] Auto-exit executed for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
+            delete pendingSidewaysExits[signalSymbol];
           }
-
-          // Auto-execute exit (for REVERSING or immediate exit if not sideways)
-          completeCycleWithoutExit(
-            currentTrade.symbol,
-            String(latestClose ?? ""),
-            `AI Guard auto-exit: ${result.reason} (${result.confidence}%) at ${now}`
-          );
-          updateLastSellCandleTime(currentTrade.symbol, signal.lastCandleTime ?? "");
-          addAiLog(`[ai-guard] Auto-exit executed for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
-          delete pendingSidewaysExits[signalSymbol];
         } else {
           // Suggest exit (already updated in the global suggestion block above)
           addAiLog(`[ai-guard] Exit suggested for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
         }
+      }
+
+      // Clear sideways pending if AI no longer suggests exit (e.g. UPWARDS)
+      if (!result.suggestExit && pendingSidewaysExits[signalSymbol]) {
+        addLogToActive(signalSymbol, `AI no longer sideways — sideways pending cancelled at ${now}`);
+        addAiLog(`[ai-guard] ${signalSymbol} no longer sideways, clearing pending sideways exit`);
+        delete pendingSidewaysExits[signalSymbol];
       }
     }).catch((e) => {
       addAiErrorLog("[ai-guard] Analysis error: " + String(e));
@@ -3913,85 +3918,6 @@ async function tick() {
 
       } catch { /* market data not running */ }
 
-    }
-
-    // 3. Handle pending sideways exits (10s retries)
-    if (isAiGuardActive()) {
-      const now = Date.now();
-      for (const symbol of Object.keys(pendingSidewaysExits)) {
-        const retry = pendingSidewaysExits[symbol];
-        if (now - retry.lastRetryTime >= 10000) {
-          retry.lastRetryTime = now;
-          retry.retryCount++;
-
-          const activeTrade = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE");
-          if (!activeTrade || !activeTrade.inPosition) {
-            delete pendingSidewaysExits[symbol];
-            continue;
-          }
-
-          const settings = getAiGuardSettings();
-          const tradeContext = {
-            entryPrice: activeTrade.entryPrice,
-            pnl: activeTrade.pnl,
-            signal: activeTrade.lotSize > 0 ? "BUY" : "SELL"
-          };
-
-          addAiLog(`[ai-guard] ${symbol}: Sideways retry #${retry.retryCount}/3...`);
-
-          fetch(`${STRATEGY_URL}/chart-history`)
-            .then(r => r.json())
-            .then(historyData => {
-              const candles = Array.isArray(historyData?.[symbol]) ? historyData[symbol] : [];
-              if (candles.length === 0) return null;
-              return analyzeMarketRegime(symbol, candles, tradeContext);
-            })
-            .then(result => {
-              if (!result) return;
-              lastAiResult[symbol] = result;
-              const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
-
-              // Update AI suggestions list during retry
-              for (let i = aiSuggestions.length - 1; i >= 0; i--) {
-                if (aiSuggestions[i].symbol === symbol && aiSuggestions[i].type === "EXIT_SUGGESTED") {
-                  aiSuggestions.splice(i, 1);
-                }
-              }
-              aiSuggestions.push({
-                symbol,
-                type: "EXIT_SUGGESTED",
-                marketRegime: result.marketRegime,
-                confidence: result.confidence,
-                reason: result.reason,
-                timestamp: timeStr,
-                dismissed: false,
-              });
-
-              if (!result.suggestExit || result.marketRegime === "UPWARDS") {
-                addLogToActive(symbol, `AI now confirms UPWARDS — sideways exit cancelled at ${timeStr}`);
-                addAiLog(`[ai-guard] ${symbol} returned to UPWARDS during retry, clearing sideways retry`);
-                delete pendingSidewaysExits[symbol];
-              } else if (retry.retryCount >= 3) {
-                if (settings.autoExitEnabled) {
-                  completeCycleWithoutExit(
-                    symbol,
-                    String(lastCandleCloseMap[symbol] ?? ""),
-                    `AI Guard auto-exit: Sideways persisted for 30s (${result.reason}, ${result.confidence}%) at ${timeStr}`
-                  );
-                  updateLastSellCandleTime(symbol, lastAiCandleTime[symbol] || "");
-                  addAiLog(`[ai-guard] Auto-exit executed for ${symbol} after 30s sideways persistence`);
-                }
-                delete pendingSidewaysExits[symbol];
-              } else {
-                addLogToActive(symbol, `AI still sideways (${result.reason}, ${result.confidence}%) — retry ${retry.retryCount}/3 at ${timeStr}`);
-                addAiLog(`[ai-guard] ${symbol} still sideways at retry #${retry.retryCount}`);
-              }
-            })
-            .catch(e => {
-              addAiErrorLog(`[ai-guard] Sideways retry error for ${symbol}: ${String(e)}`);
-            });
-        }
-      }
     }
 
     // 4. Auto Trigger check — auto-activate waiting trades based on time and/or price
