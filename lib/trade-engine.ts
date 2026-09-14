@@ -2684,7 +2684,7 @@ function handleStrategySignal(signal: any) {
       const currentTrade = activeTrades.find((t) => t.symbol === signalSymbol && t.status === "ACTIVE");
       if (result.suggestExit && currentTrade && currentTrade.inPosition) {
         if (settings.autoExitEnabled) {
-          // SIDEWAYS/CHOP require 2-candle confirmation before exiting; DOWNWARDS/REVERSING exit immediately
+          // SIDEWAYS/CHOPPY require 2-candle confirmation before exiting; DOWNWARDS/REVERSING exit immediately
           if (result.marketRegime === "SIDEWAYS" || result.marketRegime === "CHOPPY") {
             if (!pendingSidewaysExits[signalSymbol]) {
               // First sideways candle — wait for confirmation
