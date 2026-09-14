@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAiGuardSettings, buildCompactCandles, buildMarketMetrics, buildSystemPrompt, buildSystemPromptWithVolume, getProviderConfig, analyzeMarketRegimeLocal, analyzeMarketRegimeLocalV2, analyzeMarketRegimeLocalV3 } from "@/lib/ai-guard";
+import { getAiGuardSettings, buildCompactCandles, buildMarketMetrics, buildSystemPrompt, buildSystemPromptWithVolume, getProviderConfig, analyzeMarketRegimeLocal, analyzeMarketRegimeLocalV2, analyzeMarketRegimeLocalV3, analyzeMarketRegimeLocalV4 } from "@/lib/ai-guard";
 
 // POST /api/ai/TEMP_analyze-test — parse pasted CSV candle data, build prompt, call Groq/Claude or run local engine
 export async function POST(request: Request) {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const effectiveApiKey = bodyKeys[0] || settings.apiKeys?.[0] || "";
     const provider = settings.provider || "groq";
 
-    if (provider !== "local" && provider !== "local_v2" && provider !== "local_v3" && !effectiveApiKey) {
+    if (provider !== "local" && provider !== "local_v2" && provider !== "local_v3" && provider !== "local_v4" && !effectiveApiKey) {
       const providerConfig = getProviderConfig(provider);
       return NextResponse.json({ error: `No API key configured. Set your ${providerConfig.providerName} API key in AI Guard settings first.` }, { status: 400 });
     }
@@ -108,6 +108,26 @@ export async function POST(request: Request) {
         },
         ruleBreakdown: result.ruleBreakdown || [],
         model: "Local V3 (Swift Trend Sniper)",
+      });
+    }
+
+    // Local rule engine V4 (Chop & Trade Guard) — no API key or fetch needed
+    if (provider === "local_v4") {
+      const result = analyzeMarketRegimeLocalV4(displaySymbol, candles);
+      return NextResponse.json({
+        candleCount: candles.length,
+        usedCount: Math.min(candles.length, candleCount),
+        parsed: {
+          marketRegime: result.marketRegime,
+          blockEntry: result.blockEntry,
+          suggestExit: result.suggestExit,
+          confidence: result.confidence,
+          reason: result.reason,
+          rangeHigh: result.rangeHigh,
+          rangeLow: result.rangeLow,
+        },
+        ruleBreakdown: result.ruleBreakdown || [],
+        model: "Local V4 (Chop & Trade Guard)",
       });
     }
 

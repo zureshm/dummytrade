@@ -124,6 +124,8 @@ export default function ActiveTrade({
     let label = "SIDEWAYS", color = "#a855f7";
     if (ru.includes("UP") || ru.includes("BULL")) { label = "UPWARDS"; color = "#22c55e"; }
     else if (ru.includes("DOWN") || ru.includes("BEAR")) { label = "DOWNWARDS"; color = "#ef4444"; }
+    else if (ru === "CHOPPY" || ru === "CHOP") { label = "CHOPPY"; color = "#ec4899"; }
+    else if (ru === "TRADEABLE") { label = "TRADEABLE"; color = "#06b6d4"; }
     return <span style={{ marginLeft, background: color, color: "#fff", fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4 }}>{label}</span>;
   };
 
@@ -321,6 +323,12 @@ export default function ActiveTrade({
                 } else if (ru.includes("DOWN") || ru.includes("BEAR")) {
                   themeColor = "#ef4444"; // DOWNWARDS (Red)
                   label = "AI suggests ending cycle";
+                } else if (ru === "CHOPPY" || ru === "CHOP") {
+                  themeColor = "#ec4899"; // CHOPPY (Pink)
+                  label = "AI suggests CHOPPY — exit";
+                } else if (ru === "TRADEABLE") {
+                  themeColor = "#06b6d4"; // TRADEABLE (Cyan)
+                  label = "AI confirms TRADEABLE";
                 }
 
                 return (
@@ -713,6 +721,12 @@ export default function ActiveTrade({
                   } else if (ru.includes("DOWN") || ru.includes("BEAR")) {
                     themeColor = "#ef4444"; // DOWNWARDS (Red)
                     label = "AI blocked entry (Downwards)";
+                  } else if (ru === "CHOPPY" || ru === "CHOP") {
+                    themeColor = "#ec4899"; // CHOPPY (Pink)
+                    label = "AI blocked entry (Choppy)";
+                  } else if (ru === "TRADEABLE") {
+                    themeColor = "#06b6d4"; // TRADEABLE (Cyan)
+                    label = "AI confirms TRADEABLE";
                   }
 
                   return (
