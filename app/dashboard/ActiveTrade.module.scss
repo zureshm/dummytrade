@@ -238,3 +238,57 @@
   display: flex;
   gap: 8px;
 }
+
+.hideMobile {
+  @media (max-width: 420px) {
+    display: none;
+  }
+}
+
+.aiToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7280;
+  transition: color 0.2s ease;
+  
+  &.enabled {
+    color: var(--theme-popup-border, #9333ea);
+  }
+}
+
+.aiToggleTrack {
+  position: relative;
+  display: block;
+  width: 24px;
+  height: 14px;
+  border-radius: 7px;
+  background: #ccc;
+  transition: all 0.2s ease;
+  
+  .enabled & {
+    background: var(--theme-popup-border, #9333ea);
+  }
+}
+
+.aiToggleThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: left 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  
+  .enabled & {
+    left: 12px;
+  }
+}

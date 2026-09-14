@@ -142,40 +142,11 @@ export default function ActiveTrade({
             body: JSON.stringify({ symbol, enabled: !enabled }),
           }).catch(() => {});
         }}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "6px",
-          cursor: "pointer",
-          border: "none",
-          background: "transparent",
-          padding: 0,
-          fontSize: 10,
-          fontWeight: 700,
-          color: enabled ? "var(--theme-toggle-on)" : "var(--theme-text-gray-400)",
-        }}
+        className={`${styles.aiToggle} ${enabled ? styles.enabled : ""}`}
         aria-label={enabled ? "AI Guard ON — click to disable" : "AI Guard OFF — click to enable"}
       >
-        <span style={{
-          position: "relative",
-          width: 28,
-          height: 16,
-          borderRadius: 8,
-          background: enabled ? "var(--theme-toggle-on)" : "var(--theme-toggle-off)",
-          transition: "all 0.2s ease",
-          boxShadow: enabled ? "0 0 8px rgba(252, 211, 77, 0.4)" : "none",
-        }}>
-          <span style={{
-            position: "absolute",
-            top: 2,
-            left: enabled ? 14 : 2,
-            width: 12,
-            height: 12,
-            borderRadius: "50%",
-            background: "var(--theme-toggle-dot)",
-            transition: "left 0.2s ease",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.4)",
-          }} />
+        <span className={styles.aiToggleTrack}>
+          <span className={styles.aiToggleThumb} />
         </span>
         AI
       </button>
@@ -535,7 +506,7 @@ export default function ActiveTrade({
                         }}
                       >
                         <XCircle className="w-3 h-3" />
-                        Remove
+                        <span className={styles.hideMobile}>Remove</span>
                       </button>
                       {historyFailed && (
                         <button
@@ -546,7 +517,7 @@ export default function ActiveTrade({
                             fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-init`, { method: "POST" }).catch(() => {});
                           }}
                         >
-                          Keep anyway
+                          <span className={styles.hideMobile}>Keep anyway</span>
                         </button>
                       )}
                       <button
@@ -559,7 +530,7 @@ export default function ActiveTrade({
                         }}
                       >
                         <Play className="w-3 h-3" />
-                        Force&nbsp;Init
+                        <span className={styles.hideMobile}>Force&nbsp;Init</span>
                       </button>
                     </div>
                   </div>
@@ -605,7 +576,7 @@ export default function ActiveTrade({
                         }}
                       >
                         <Play className="w-3 h-3" />
-                        Force&nbsp;Init
+                        <span className={styles.hideMobile}>Force&nbsp;Init</span>
                       </button>
                       <button
                         className={`${styles.waitingBtn} ${styles.danger}`}
@@ -617,7 +588,7 @@ export default function ActiveTrade({
                         }}
                       >
                         <XCircle className="w-3 h-3" />
-                        Cancel
+                        <span className={styles.hideMobile}>Cancel</span>
                       </button>
                     </div>
                   </div>
