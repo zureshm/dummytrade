@@ -410,7 +410,7 @@ export default function ChartPopup({ open, onClose }: Props) {
   useEffect(() => {
     const symbols = Object.keys(symbolCandles)
       .filter((s) => activeSymbols.has(s))
-      .slice(0, 6);
+      .slice(0, 8);
 
     // Dispose charts for symbols no longer active
     Object.keys(chartInstances.current).forEach((key) => {
@@ -619,7 +619,7 @@ export default function ChartPopup({ open, onClose }: Props) {
               <div className="text-sm py-8 text-center" style={{ color: "var(--theme-status-loss)" }}>{error}</div>
             ) : (
               <div className="flex flex-col gap-4">
-                {[...activeSymbols].slice(0, 6).map((symbol) => {
+                {[...activeSymbols].slice(0, 8).map((symbol) => {
                   const hasData = symbolCandles[symbol] && symbolCandles[symbol].length > 0;
                   return (
                     <div key={symbol}>
