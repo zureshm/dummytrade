@@ -339,7 +339,7 @@ export default function ActiveTrade({
                       </button>
                       )}
                       <button
-                        className={`${styles.waitingBtn} ${styles.danger}`}
+                        className={`${styles.waitingBtn} ${styles.danger} ai-dismiss-btn`}
                         type="button"
                         style={{ padding: "2px 8px", fontSize: "11px" }}
                         onClick={() => {
@@ -517,7 +517,7 @@ export default function ActiveTrade({
                       </button>
                       {historyFailed && (
                         <button
-                          className={`${styles.waitingBtn} ${styles.dark}`}
+                          className={`${styles.waitingBtn} ${styles.dark} keep-anyway-btn`}
                           type="button"
                           style={{ padding: "2px 8px", fontSize: "11px" }}
                           onClick={() => {
