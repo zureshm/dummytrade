@@ -203,13 +203,8 @@ type WaitingTrade = {
 
 
   minToHoldTrailing: boolean;
-
-
-
   minToHoldMode?: "live" | "candleClose";
-
-
-
+  minToHoldArmMode?: "live" | "candleClose";
   trailingAfterTargetEnabled: boolean;
 
 
@@ -322,6 +317,7 @@ type ActiveTrade = {
   minToHoldTrigger: number;
   minToHoldTrailing: boolean;
   minToHoldMode?: "live" | "candleClose";
+  minToHoldArmMode?: "live" | "candleClose";
   trailingAfterTargetEnabled: boolean;
   trailingAfterTarget: number;
   trailingMode: "live" | "candleClose";
@@ -451,13 +447,8 @@ type TradeHistoryItem = {
 
 
     minToHoldTrigger?: number;
-
-
-
     minToHoldMode?: "live" | "candleClose";
-
-
-
+    minToHoldArmMode?: "live" | "candleClose";
   };
 
 
@@ -738,10 +729,7 @@ const BUY_GRACE_PERIOD_MS = 5000;
 const lastBuyCandleTime: Record<string, string> = {};
 
 // Grace period after minimum-target arming: ignore stale candle data for trigger check
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _trailingArmTimestamp: Record<string, number> = {};
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _TRAILING_ARM_GRACE_MS = 5000;
+
 
 
 
@@ -1186,9 +1174,7 @@ function buildConfigSnapshot(trade: ActiveTrade): TradeHistoryItem["config"] {
 
 
     minToHoldMode: trade.minToHoldEnabled ? trade.minToHoldMode : undefined,
-
-
-
+    minToHoldArmMode: trade.minToHoldEnabled ? trade.minToHoldArmMode : undefined,
   };
 
 
@@ -1393,6 +1379,8 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
 
     minToHoldMode: trade.minToHoldMode,
+
+    minToHoldArmMode: trade.minToHoldArmMode,
 
 
 
@@ -3407,11 +3395,18 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-    const targetPrice = trade.targetMode === "candleClose" && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
+    const isBacktestMode = !String(lastStrategyCandleTime).includes("-");
+    const useCloseForTarget = isBacktestMode || trade.targetMode === "candleClose";
+    const useCloseForTrailing = isBacktestMode || trade.trailingMode === "candleClose";
+    const useCloseForMinArm = isBacktestMode || trade.minToHoldArmMode === "candleClose";
+    const useCloseForMinTrigger = isBacktestMode || trade.minToHoldMode === "candleClose";
 
-    const trailingPrice = trade.trailingMode === "candleClose" && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
+    const targetPrice = useCloseForTarget && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
 
-    const minTargetPrice = trade.minToHoldMode === "candleClose" && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
+    const trailingPrice = useCloseForTrailing && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
+
+    const minTargetArmPrice = useCloseForMinArm && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
+    const minTargetTriggerPrice = useCloseForMinTrigger && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
 
 
 
@@ -3604,13 +3599,6 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
 
 
-    const priceDiff = ltp - entry;
-
-
-
-
-
-
     const trailingEnabled = trade.targetPointsEnabled && trade.targetPoints > 0 && trade.trailingAfterTargetEnabled && trade.trailingAfterTarget > 0;
 
     // ── Stop Loss & Trailing Stop Loss Calculation ──
@@ -3643,26 +3631,26 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
       const activationLevel = trailLevel + effectiveMinTrigger;
 
       if (!trailingArmedPositions.has(positionKey)) {
-        if (minTargetPrice >= activationLevel) {
+        if (minTargetArmPrice >= activationLevel) {
           trailingArmedPositions.add(positionKey);
-          addLogToActive(trade.symbol, `${useReEntryMinTarget ? "ReEntry " : ""}Minimum target armed at ₹${minTargetPrice.toFixed(2)} (activation: ₹${activationLevel.toFixed(2)}) at ${currentTime}`);
+          addLogToActive(trade.symbol, `${useReEntryMinTarget ? "ReEntry " : ""}Minimum target armed at ₹${minTargetArmPrice.toFixed(2)} (activation: ₹${activationLevel.toFixed(2)}) at ${currentTime}`);
           persistState();
         }
       } else {
         if (effectiveMinTrailing && trade.minTargetLockedPrice === undefined) {
-          updateMinTargetHighWatermark(trade.symbol, minTargetPrice);
+          updateMinTargetHighWatermark(trade.symbol, minTargetArmPrice);
         }
-        const minTargetHigh = trade.minTargetHighWatermark ?? minTargetPrice;
+        const minTargetHigh = trade.minTargetHighWatermark ?? minTargetArmPrice;
         const minTargetFloor = (trade.minTargetLockedPrice !== undefined)
           ? trade.minTargetLockedPrice
           : (effectiveMinTrailing ? minTargetHigh - effectiveMinTrigger : trailLevel);
 
-        if (minTargetPrice <= minTargetFloor) {
+        if (minTargetTriggerPrice <= minTargetFloor) {
           // If Trailing SL floor is strictly higher than Min Target floor, let Trailing SL execute
           if (effectiveSLEnabled && effectiveSL > 0 && trailedSLLevel > minTargetFloor) {
             // Defer to Trailing SL check below
           } else {
-            const exitPrice = Math.min(minTargetPrice, minTargetFloor);
+            const exitPrice = Math.min(minTargetTriggerPrice, minTargetFloor);
             triggeredPositions.add(positionKey);
             trailingArmedPositions.delete(positionKey);
             completeCycleWithoutExit(trade.symbol, String(exitPrice), `${useReEntryMinTarget ? "ReEntry " : ""}${effectiveMinTrailing ? "TRAILING MIN TARGET" : "MINIMUM TARGET"} hit for ₹${exitPrice.toFixed(2)} at ${currentTime}`);
@@ -4163,7 +4151,7 @@ export function updateActiveTradeConfig(symbol: string, config: Record<string, u
     "trailingStopLossEnabled", "trailingStopLossSteps",
     "targetPointsEnabled", "targetPoints", "targetMode",
     "trailingAfterTarget", "trailingMode",
-    "minToHoldEnabled", "minToHold", "minToHoldTrigger", "minToHoldTrailing", "minToHoldMode",
+    "minToHoldEnabled", "minToHold", "minToHoldTrigger", "minToHoldTrailing", "minToHoldMode", "minToHoldArmMode",
     "maxProfitLossEnabled", "maxProfit", "maxLoss",
     "sellWhenLossCandlesEnabled", "sellWhenLossCandles",
     "reEntryAfterTargetEnabled", "reEntryStartCandle", "reEntryCandles", "reEntryPoints",
