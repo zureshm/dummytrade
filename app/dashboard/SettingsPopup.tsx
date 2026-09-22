@@ -1,15 +1,29 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import type { FocusEvent, InputHTMLAttributes } from "react";
 import { X, Settings, Play, Palette, Shield, HelpCircle, Loader2, FlaskConical, Volume2, Zap, GitBranch, Clock } from "lucide-react";
 import { playSound, setVolume } from "@/lib/sounds";
 import { BASE_PATH } from "@/lib/basePath";
 import { useTheme } from "@/components/ThemeProvider";
 import { useTradeStore } from "../store/TradeStore";
 
-function ClampedNumericField({ value, onChange, min, max, ...props }: any) {
+interface ClampedNumericFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
+  value: number;
+  onChange: (val: number) => void;
+  min: number;
+  max: number;
+}
+
+function ClampedNumericField({ value, onChange, min, max, ...props }: ClampedNumericFieldProps) {
   const [local, setLocal] = useState<string>(value != null ? String(value) : "");
-  useEffect(() => { setLocal(value != null ? String(value) : ""); }, [value]);
+  const [prevValue, setPrevValue] = useState<number>(value);
+
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setLocal(value != null ? String(value) : "");
+  }
+
   return (
     <input
       {...props}
@@ -25,9 +39,11 @@ function ClampedNumericField({ value, onChange, min, max, ...props }: any) {
           if (!isNaN(val) && val >= min && val <= max) onChange(val);
         }
       }}
-      onBlur={(e: any) => {
-        if (!e.target.value) { setLocal(String(min)); onChange(min); }
-        else {
+      onBlur={(e: FocusEvent<HTMLInputElement>) => {
+        if (!e.target.value) {
+          setLocal(String(min));
+          onChange(min);
+        } else {
           const val = parseInt(e.target.value, 10);
           const clamped = Math.min(max, Math.max(min, val));
           setLocal(String(clamped));
@@ -92,6 +108,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
   const [aiAutoExitEnabled, setAiAutoExitEnabled] = useState(false);
   const [aiCandlesCount, setAiCandlesCount] = useState(90);
   const [aiRecentCandlesCount, setAiRecentCandlesCount] = useState(30);
+  const [aiEntryBufferMaxCandles, setAiEntryBufferMaxCandles] = useState(1);
   const [aiConsiderVolume, setAiConsiderVolume] = useState(false);
   const [aiUseHeikinAshi, setAiUseHeikinAshi] = useState(true);
   const [aiProvider, setAiProvider] = useState("local");
@@ -166,6 +183,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
           setAiAutoExitEnabled(Boolean(data.autoExitEnabled));
           if (typeof data.candlesCount === "number") setAiCandlesCount(data.candlesCount);
           if (typeof data.recentCandlesCount === "number") setAiRecentCandlesCount(data.recentCandlesCount);
+          if (typeof data.entryBufferMaxCandles === "number") setAiEntryBufferMaxCandles(data.entryBufferMaxCandles);
           if (typeof data.considerVolume === "boolean") setAiConsiderVolume(data.considerVolume);
           if (typeof data.useHeikinAshi === "boolean") setAiUseHeikinAshi(data.useHeikinAshi);
           if (typeof data.provider === "string") setAiProvider(data.provider);
@@ -178,6 +196,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
           localStorage.setItem("dummy_aiAutoExitEnabled", String(data.autoExitEnabled));
           localStorage.setItem("dummy_aiCandlesCount", String(data.candlesCount));
           localStorage.setItem("dummy_aiRecentCandlesCount", String(data.recentCandlesCount));
+          localStorage.setItem("dummy_aiEntryBufferMaxCandles", String(data.entryBufferMaxCandles || 1));
           localStorage.setItem("dummy_aiConsiderVolume", String(data.considerVolume || false));
           localStorage.setItem("dummy_aiUseHeikinAshi", String(data.useHeikinAshi !== false));
           localStorage.setItem("dummy_aiProvider", data.provider);
@@ -197,6 +216,8 @@ export default function SettingsPopup({ open, onClose }: Props) {
         if (aiCandles) setAiCandlesCount(parseInt(aiCandles, 10));
         const aiRecentCandles = localStorage.getItem("dummy_aiRecentCandlesCount");
         if (aiRecentCandles) setAiRecentCandlesCount(parseInt(aiRecentCandles, 10));
+        const aiEntryBuffer = localStorage.getItem("dummy_aiEntryBufferMaxCandles");
+        if (aiEntryBuffer) setAiEntryBufferMaxCandles(parseInt(aiEntryBuffer, 10));
         const aiVol = localStorage.getItem("dummy_aiConsiderVolume");
         if (aiVol) setAiConsiderVolume(aiVol === "true");
         const aiHA = localStorage.getItem("dummy_aiUseHeikinAshi");
@@ -220,12 +241,13 @@ export default function SettingsPopup({ open, onClose }: Props) {
     localStorage.setItem("dummy_aiAutoExitEnabled", String(aiAutoExitEnabled));
     localStorage.setItem("dummy_aiCandlesCount", String(aiCandlesCount));
     localStorage.setItem("dummy_aiRecentCandlesCount", String(aiRecentCandlesCount));
+    localStorage.setItem("dummy_aiEntryBufferMaxCandles", String(aiEntryBufferMaxCandles));
     localStorage.setItem("dummy_aiConsiderVolume", String(aiConsiderVolume));
     localStorage.setItem("dummy_aiUseHeikinAshi", String(aiUseHeikinAshi));
     localStorage.setItem("dummy_aiProvider", aiProvider);
     localStorage.setItem("dummy_aiModel", aiModel);
     localStorage.setItem("dummy_aiApiKey", aiApiKey);
-  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiConsiderVolume, aiUseHeikinAshi, aiProvider, aiModel, aiApiKey]);
+  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiEntryBufferMaxCandles, aiConsiderVolume, aiUseHeikinAshi, aiProvider, aiModel, aiApiKey]);
 
   // POST AI Guard settings to backend (debounced, only after initial server load)
   const postAiSettings = useCallback(() => {
@@ -241,6 +263,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
           autoExitEnabled: aiAutoExitEnabled,
           candlesCount: aiCandlesCount,
           recentCandlesCount: aiRecentCandlesCount,
+          entryBufferMaxCandles: aiEntryBufferMaxCandles,
           considerVolume: aiConsiderVolume,
           useHeikinAshi: aiUseHeikinAshi,
           provider: aiProvider,
@@ -249,7 +272,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
         }),
       }).catch(() => {});
     }, 500);
-  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiConsiderVolume, aiUseHeikinAshi, aiProvider, aiModel, aiApiKey]);
+  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiEntryBufferMaxCandles, aiConsiderVolume, aiUseHeikinAshi, aiProvider, aiModel, aiApiKey]);
 
   useEffect(() => { postAiSettings(); }, [postAiSettings]);
 
@@ -942,6 +965,31 @@ export default function SettingsPopup({ open, onClose }: Props) {
                           fontWeight: 700,
                         }}
                       />
+                    </div>
+                  </div>
+
+                  {/* Buffer Buy upto */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="relative flex items-center gap-1.5">
+                        <label className="text-xs font-semibold" style={{ color: "var(--theme-popup-text)" }}>Buffer Buy upto</label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ClampedNumericField
+                          value={aiEntryBufferMaxCandles}
+                          onChange={setAiEntryBufferMaxCandles}
+                          min={1}
+                          max={10}
+                          className="w-16 h-7 px-2 rounded-lg text-xs text-center"
+                          style={{
+                            background: "var(--theme-popup-field-bg)",
+                            color: "var(--theme-accent-gold, var(--theme-popup-text))",
+                            border: "1px solid var(--theme-popup-field-border)",
+                            fontWeight: 700,
+                          }}
+                        />
+                        <span className="text-[10px]" style={{ color: "var(--theme-popup-label)" }}>candles</span>
+                      </div>
                     </div>
                   </div>
 
