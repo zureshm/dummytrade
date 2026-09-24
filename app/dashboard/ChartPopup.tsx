@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
-import { X, BarChart2, RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
-import { createChart, CandlestickSeries, IChartApi, UTCTimestamp, SeriesMarker, Time, createSeriesMarkers, LineSeries, ISeriesApi } from "lightweight-charts";
+import { X, BarChart2, RefreshCw, Loader2 } from "lucide-react";
+import { createChart, CandlestickSeries, IChartApi, UTCTimestamp, SeriesMarker, Time, createSeriesMarkers, LineSeries, ISeriesApi, ISeriesMarkersPluginApi } from "lightweight-charts";
 import { useTradeStore } from "../store/TradeStore";
 
 interface NumericFieldProps extends Omit<React.ComponentProps<"input">, "value" | "onChange"> {
@@ -148,6 +148,87 @@ function calculateEMA(prices: number[], period: number): number[] {
   return ema;
 }
 
+// UTBot Signal Type
+type UTBotSignal = {
+  time: number;
+  type: "BUY" | "SELL";
+};
+
+// Calculate UTBot Signals
+function calculateUTBot(candles: CandleData[], key: number, atrPeriod: number): UTBotSignal[] {
+  if (candles.length < atrPeriod + 1) return [];
+
+  // 1. Calculate TR (True Range)
+  const trs: number[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    const high = candles[i].high;
+    const low = candles[i].low;
+    const prevClose = candles[i - 1].close;
+    trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
+  }
+
+  // 2. Calculate ATR using RMA (Running Moving Average) - as used in TradingView's ATR
+  function calculateRMA(data: number[], period: number): number[] {
+    if (data.length < period) return [];
+    const rma: number[] = [];
+    const alpha = 1 / period;
+    
+    // First value is SMA
+    let sum = 0;
+    for (let i = 0; i < period; i++) sum += data[i];
+    rma.push(sum / period);
+    
+    // Subsequent values use alpha
+    for (let i = period; i < data.length; i++) {
+      rma.push(alpha * data[i] + (1 - alpha) * rma[rma.length - 1]);
+    }
+    return rma;
+  }
+
+  const atrs = calculateRMA(trs, atrPeriod);
+  if (atrs.length === 0) return [];
+
+  // 3. UTBot Logic
+  const signals: UTBotSignal[] = [];
+  let trailingStop = 0;
+  let prevPos = 0; // 1 for long, -1 for short
+  
+  // The first ATR value is at index (atrPeriod - 1) in trs array, which corresponds to candle index (atrPeriod)
+  const startCandleIdx = atrPeriod;
+
+  for (let i = 0; i < atrs.length; i++) {
+    const candleIdx = startCandleIdx + i;
+    const src = candles[candleIdx].close;
+    const prevSrc = candles[candleIdx - 1].close;
+    const nLoss = key * atrs[i];
+
+    let nextTrailingStop = trailingStop;
+    
+    if (src > trailingStop && prevSrc > trailingStop) {
+      nextTrailingStop = Math.max(trailingStop, src - nLoss);
+    } else if (src < trailingStop && prevSrc < trailingStop) {
+      nextTrailingStop = Math.min(trailingStop, src + nLoss);
+    } else if (src > trailingStop) {
+      nextTrailingStop = src - nLoss;
+    } else {
+      nextTrailingStop = src + nLoss;
+    }
+
+    const pos = src > nextTrailingStop ? 1 : (src < nextTrailingStop ? -1 : prevPos);
+    
+    if (pos === 1 && prevPos !== 1) {
+      signals.push({ time: toChartTime(candles[candleIdx].time) as number, type: "BUY" });
+    } else if (pos === -1 && prevPos !== -1) {
+      signals.push({ time: toChartTime(candles[candleIdx].time) as number, type: "SELL" });
+    }
+
+    trailingStop = nextTrailingStop;
+    prevPos = pos;
+  }
+
+  return signals;
+}
+
 // Convert time string to Unix timestamp (seconds) for lightweight-charts
 // Handles: "2026-06-04 14:55" (live), "2026-06-05T11:36:00+05:30" (history), numeric
 // We strip timezone and treat as UTC so chart shows the local IST time as-is
@@ -193,33 +274,112 @@ export default function ChartPopup({ open, onClose }: Props) {
   const [spinning, setSpinning] = useState(false);
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const chartInstances = useRef<Record<string, IChartApi>>({});
-  const seriesInstances = useRef<Record<string, { main: ISeriesApi<"Candlestick">; ema1: ISeriesApi<"Line">; ema2: ISeriesApi<"Line"> }>>({});
+  const seriesInstances = useRef<Record<string, { main: ISeriesApi<"Candlestick">; ema1: ISeriesApi<"Line">; ema2: ISeriesApi<"Line">; markerPlugin: ISeriesMarkersPluginApi<Time> }>>({});
 
   // Nifty50 live chart state
   const [nifty50Data, setNifty50Data] = useState<Nifty50CandleData>({ completedCandles: [], currentCandle: null });
   const [nifty50Connected, setNifty50Connected] = useState(false);
   const nifty50ChartRef = useRef<HTMLDivElement | null>(null);
   const nifty50ChartInstance = useRef<IChartApi | null>(null);
-  const nifty50SeriesInstance = useRef<{ main: ISeriesApi<"Candlestick">; ema1: ISeriesApi<"Line">; ema2: ISeriesApi<"Line"> } | null>(null);
+  const nifty50SeriesInstance = useRef<{ main: ISeriesApi<"Candlestick">; ema1: ISeriesApi<"Line">; ema2: ISeriesApi<"Line">; markerPlugin: ISeriesMarkersPluginApi<Time> } | null>(null);
 
   // Indicators state
   const [indicatorsOpen, setIndicatorsOpen] = useState(false);
-  const [ema1Enabled, setEma1Enabled] = useState(true);
-  const [ema1Period, setEma1Period] = useState(10);
-  const [ema2Enabled, setEma2Enabled] = useState(true);
-  const [ema2Period, setEma2Period] = useState(30);
+  const [ema1Enabled, setEma1Enabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_ema1_enabled");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+  const [ema1Period, setEma1Period] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_ema1_period");
+      return saved !== null ? parseInt(saved, 10) : 10;
+    }
+    return 10;
+  });
+  const [ema2Enabled, setEma2Enabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_ema2_enabled");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+  const [ema2Period, setEma2Period] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_ema2_period");
+      return saved !== null ? parseInt(saved, 10) : 30;
+    }
+    return 30;
+  });
 
-  // Load indicator settings
-  useEffect(() => {
-    const e1e = localStorage.getItem("nifty_ema1_enabled");
-    if (e1e !== null) setEma1Enabled(e1e === "true");
-    const e1p = localStorage.getItem("nifty_ema1_period");
-    if (e1p !== null) setEma1Period(parseInt(e1p, 10));
-    const e2e = localStorage.getItem("nifty_ema2_enabled");
-    if (e2e !== null) setEma2Enabled(e2e === "true");
-    const e2p = localStorage.getItem("nifty_ema2_period");
-    if (e2p !== null) setEma2Period(parseInt(e2p, 10));
-  }, []);
+  // UTBot states
+  const [utbot1Enabled, setUtbot1Enabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot1_enabled");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+  const [utbot1Key, setUtbot1Key] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot1_key");
+      return saved !== null ? parseFloat(saved) : 2;
+    }
+    return 2;
+  });
+  const [utbot1Atr, setUtbot1Atr] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot1_atr");
+      return saved !== null ? parseInt(saved, 10) : 10;
+    }
+    return 10;
+  });
+
+  const [utbot2Enabled, setUtbot2Enabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot2_enabled");
+      return saved !== null ? saved === "true" : false;
+    }
+    return false;
+  });
+  const [utbot2Key, setUtbot2Key] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot2_key");
+      return saved !== null ? parseFloat(saved) : 3;
+    }
+    return 3;
+  });
+  const [utbot2Atr, setUtbot2Atr] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot2_atr");
+      return saved !== null ? parseInt(saved, 10) : 10;
+    }
+    return 10;
+  });
+
+  const [utbot3Enabled, setUtbot3Enabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot3_enabled");
+      return saved !== null ? saved === "true" : false;
+    }
+    return false;
+  });
+  const [utbot3Key, setUtbot3Key] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot3_key");
+      return saved !== null ? parseFloat(saved) : 4;
+    }
+    return 4;
+  });
+  const [utbot3Atr, setUtbot3Atr] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("nifty_utbot3_atr");
+      return saved !== null ? parseInt(saved, 10) : 10;
+    }
+    return 10;
+  });
 
   // Save indicator settings
   useEffect(() => {
@@ -227,7 +387,24 @@ export default function ChartPopup({ open, onClose }: Props) {
     localStorage.setItem("nifty_ema1_period", String(ema1Period));
     localStorage.setItem("nifty_ema2_enabled", String(ema2Enabled));
     localStorage.setItem("nifty_ema2_period", String(ema2Period));
-  }, [ema1Enabled, ema1Period, ema2Enabled, ema2Period]);
+
+    localStorage.setItem("nifty_utbot1_enabled", String(utbot1Enabled));
+    localStorage.setItem("nifty_utbot1_key", String(utbot1Key));
+    localStorage.setItem("nifty_utbot1_atr", String(utbot1Atr));
+
+    localStorage.setItem("nifty_utbot2_enabled", String(utbot2Enabled));
+    localStorage.setItem("nifty_utbot2_key", String(utbot2Key));
+    localStorage.setItem("nifty_utbot2_atr", String(utbot2Atr));
+
+    localStorage.setItem("nifty_utbot3_enabled", String(utbot3Enabled));
+    localStorage.setItem("nifty_utbot3_key", String(utbot3Key));
+    localStorage.setItem("nifty_utbot3_atr", String(utbot3Atr));
+  }, [
+    ema1Enabled, ema1Period, ema2Enabled, ema2Period,
+    utbot1Enabled, utbot1Key, utbot1Atr,
+    utbot2Enabled, utbot2Key, utbot2Atr,
+    utbot3Enabled, utbot3Key, utbot3Atr
+  ]);
 
   // Only show charts for symbols in active/waiting trades
   // Stabilize: only return new Set when actual symbol list changes
@@ -355,10 +532,10 @@ export default function ChartPopup({ open, onClose }: Props) {
       const ema2 = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1 });
 
       nifty50ChartInstance.current = chart;
-      nifty50SeriesInstance.current = { main: series, ema1, ema2 };
+      nifty50SeriesInstance.current = { main: series, ema1, ema2, markerPlugin: createSeriesMarkers(series) };
     }
 
-    const { main, ema1, ema2 } = nifty50SeriesInstance.current!;
+    const { main, ema1, ema2, markerPlugin } = nifty50SeriesInstance.current!;
 
     const mapped = allCandles
       .map((c) => ({
@@ -408,12 +585,61 @@ export default function ChartPopup({ open, onClose }: Props) {
       } else {
         ema2.setData([]);
       }
+
+      // UTBot Markers
+      const markers: SeriesMarker<Time>[] = [];
+      
+      if (utbot1Enabled) {
+        const ut1Signals = calculateUTBot(allCandles, utbot1Key, utbot1Atr);
+        ut1Signals.forEach(s => {
+          markers.push({
+            time: s.time as Time,
+            position: s.type === "BUY" ? "belowBar" : "aboveBar",
+            color: s.type === "BUY" ? "#a855f7" : "#fbbf24",
+            shape: s.type === "BUY" ? "arrowUp" : "arrowDown",
+            text: "",
+          });
+        });
+      }
+
+      if (utbot2Enabled) {
+        const ut2Signals = calculateUTBot(allCandles, utbot2Key, utbot2Atr);
+        ut2Signals.forEach(s => {
+          markers.push({
+            time: s.time as Time,
+            position: s.type === "BUY" ? "belowBar" : "aboveBar",
+            color: s.type === "BUY" ? "#06b6d4" : "#f472b6",
+            shape: s.type === "BUY" ? "arrowUp" : "arrowDown",
+            text: "",
+          });
+        });
+      }
+
+      if (utbot3Enabled) {
+        const ut3Signals = calculateUTBot(allCandles, utbot3Key, utbot3Atr);
+        ut3Signals.forEach(s => {
+          markers.push({
+            time: s.time as Time,
+            position: s.type === "BUY" ? "belowBar" : "aboveBar",
+            color: s.type === "BUY" ? "#16a34a" : "#dc2626",
+            shape: s.type === "BUY" ? "arrowUp" : "arrowDown",
+            text: "",
+          });
+        });
+      }
+
+      // Sort markers by time before setting
+      markers.sort((a, b) => (a.time as number) - (b.time as number));
+      markerPlugin.setMarkers(markers);
     }
 
     return () => {
       // We don't remove chart on every update anymore
     };
-  }, [nifty50Data, ema1Enabled, ema1Period, ema2Enabled, ema2Period]);
+  }, [nifty50Data, ema1Enabled, ema1Period, ema2Enabled, ema2Period, 
+      utbot1Enabled, utbot1Key, utbot1Atr, 
+      utbot2Enabled, utbot2Key, utbot2Atr, 
+      utbot3Enabled, utbot3Key, utbot3Atr]);
 
   // Clean up Nifty50 chart on close
   useEffect(() => {
@@ -541,10 +767,10 @@ export default function ChartPopup({ open, onClose }: Props) {
         const ema2 = chart.addSeries(LineSeries, { color: "#ffd932", lineWidth: 1 });
 
         chartInstances.current[symbol] = chart;
-        seriesInstances.current[symbol] = { main, ema1, ema2 };
+        seriesInstances.current[symbol] = { main, ema1, ema2, markerPlugin: createSeriesMarkers(main) };
       }
 
-      const { main, ema1, ema2 } = seriesInstances.current[symbol];
+      const { main, ema1, ema2, markerPlugin } = seriesInstances.current[symbol];
 
       // Filter invalid times, deduplicate, and sort ascending
       const mapped = candles
@@ -595,9 +821,7 @@ export default function ChartPopup({ open, onClose }: Props) {
             text: "",
           }));
 
-        if (markers.length > 0) {
-          createSeriesMarkers(main, markers);
-        }
+        markerPlugin.setMarkers(markers);
       }
     });
   }, [symbolCandles, activeSymbols]);
@@ -724,7 +948,7 @@ export default function ChartPopup({ open, onClose }: Props) {
                     type="checkbox"
                     checked={ema1Enabled}
                     onChange={(e) => setEma1Enabled(e.target.checked)}
-                    className="h-3.5 w-3.5 accent-blue-500"
+                    className="h-3.5 w-3.5 accent-blue-600"
                   />
                   <span className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>EMA 1</span>
                 </div>
@@ -750,7 +974,7 @@ export default function ChartPopup({ open, onClose }: Props) {
                     type="checkbox"
                     checked={ema2Enabled}
                     onChange={(e) => setEma2Enabled(e.target.checked)}
-                    className="h-3.5 w-3.5 accent-orange-500"
+                    className="h-3.5 w-3.5 accent-orange-600"
                   />
                   <span className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>EMA 2</span>
                 </div>
@@ -766,6 +990,135 @@ export default function ChartPopup({ open, onClose }: Props) {
                     }}
                     fallback="30"
                   />
+                </div>
+              </div>
+
+              {/* UTBot 1 */}
+              <div className="flex items-center justify-between pt-2" style={{ borderTop: "1px solid rgba(0,0,0,0.05)" }}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={utbot1Enabled}
+                    onChange={(e) => setUtbot1Enabled(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-purple-600"
+                  />
+                  <span className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>UTBOT 1</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold opacity-50">KEY</span>
+                    <NumericField
+                      value={utbot1Key}
+                      onChange={setUtbot1Key}
+                      className="w-10 h-7 rounded text-center text-xs font-bold"
+                      style={{
+                        background: "var(--theme-popup-field-bg)",
+                        color: "var(--theme-popup-text)",
+                        border: "1px solid var(--theme-popup-field-border)",
+                      }}
+                      fallback="2"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold opacity-50">ATR</span>
+                    <NumericField
+                      value={utbot1Atr}
+                      onChange={setUtbot1Atr}
+                      className="w-10 h-7 rounded text-center text-xs font-bold"
+                      style={{
+                        background: "var(--theme-popup-field-bg)",
+                        color: "var(--theme-popup-text)",
+                        border: "1px solid var(--theme-popup-field-border)",
+                      }}
+                      fallback="10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* UTBot 2 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={utbot2Enabled}
+                    onChange={(e) => setUtbot2Enabled(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-cyan-600"
+                  />
+                  <span className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>UTBOT 2</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold opacity-50">KEY</span>
+                    <NumericField
+                      value={utbot2Key}
+                      onChange={setUtbot2Key}
+                      className="w-10 h-7 rounded text-center text-xs font-bold"
+                      style={{
+                        background: "var(--theme-popup-field-bg)",
+                        color: "var(--theme-popup-text)",
+                        border: "1px solid var(--theme-popup-field-border)",
+                      }}
+                      fallback="3"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold opacity-50">ATR</span>
+                    <NumericField
+                      value={utbot2Atr}
+                      onChange={setUtbot2Atr}
+                      className="w-10 h-7 rounded text-center text-xs font-bold"
+                      style={{
+                        background: "var(--theme-popup-field-bg)",
+                        color: "var(--theme-popup-text)",
+                        border: "1px solid var(--theme-popup-field-border)",
+                      }}
+                      fallback="10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* UTBot 3 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={utbot3Enabled}
+                    onChange={(e) => setUtbot3Enabled(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-green-600"
+                  />
+                  <span className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>UTBOT 3</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold opacity-50">KEY</span>
+                    <NumericField
+                      value={utbot3Key}
+                      onChange={setUtbot3Key}
+                      className="w-10 h-7 rounded text-center text-xs font-bold"
+                      style={{
+                        background: "var(--theme-popup-field-bg)",
+                        color: "var(--theme-popup-text)",
+                        border: "1px solid var(--theme-popup-field-border)",
+                      }}
+                      fallback="4"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold opacity-50">ATR</span>
+                    <NumericField
+                      value={utbot3Atr}
+                      onChange={setUtbot3Atr}
+                      className="w-10 h-7 rounded text-center text-xs font-bold"
+                      style={{
+                        background: "var(--theme-popup-field-bg)",
+                        color: "var(--theme-popup-text)",
+                        border: "1px solid var(--theme-popup-field-border)",
+                      }}
+                      fallback="10"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
