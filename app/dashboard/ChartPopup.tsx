@@ -1,9 +1,46 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
-import { X, BarChart2, RefreshCw, Loader2 } from "lucide-react";
+import { X, BarChart2, RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { createChart, CandlestickSeries, IChartApi, UTCTimestamp, SeriesMarker, Time, createSeriesMarkers, LineSeries, ISeriesApi } from "lightweight-charts";
 import { useTradeStore } from "../store/TradeStore";
+
+interface NumericFieldProps extends Omit<React.ComponentProps<"input">, "value" | "onChange"> {
+  value: number | undefined | null;
+  onChange: (val: number) => void;
+  fallback?: string;
+}
+
+function NumericField({ value, onChange, onBlur, fallback = "0", ...props }: NumericFieldProps) {
+  const [local, setLocal] = useState<string>(value != null ? String(value) : "");
+  const [prevValue, setPrevValue] = useState(value);
+
+  if (value !== prevValue) {
+    setLocal(value != null ? String(value) : "");
+    setPrevValue(value);
+  }
+  return (
+    <input
+      {...props}
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={local}
+      onChange={(e) => {
+        const cleaned = e.target.value.replace(/\D/g, "");
+        setLocal(cleaned);
+        onChange(cleaned === "" ? 0 : Number(cleaned));
+      }}
+      onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+        if (!e.target.value) {
+          setLocal(fallback);
+          onChange(Number(fallback));
+        }
+        onBlur?.(e);
+      }}
+    />
+  );
+}
 
 const STRATEGY_URL = process.env.NEXT_PUBLIC_STRATEGY_API_URL || "http://localhost:4000";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:2000";
@@ -156,14 +193,41 @@ export default function ChartPopup({ open, onClose }: Props) {
   const [spinning, setSpinning] = useState(false);
   const chartRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const chartInstances = useRef<Record<string, IChartApi>>({});
-  const seriesInstances = useRef<Record<string, { main: ISeriesApi<"Candlestick">; ema10: ISeriesApi<"Line">; ema20: ISeriesApi<"Line"> }>>({});
+  const seriesInstances = useRef<Record<string, { main: ISeriesApi<"Candlestick">; ema1: ISeriesApi<"Line">; ema2: ISeriesApi<"Line"> }>>({});
 
   // Nifty50 live chart state
   const [nifty50Data, setNifty50Data] = useState<Nifty50CandleData>({ completedCandles: [], currentCandle: null });
   const [nifty50Connected, setNifty50Connected] = useState(false);
   const nifty50ChartRef = useRef<HTMLDivElement | null>(null);
   const nifty50ChartInstance = useRef<IChartApi | null>(null);
-  const nifty50SeriesInstance = useRef<{ main: ISeriesApi<"Candlestick">; ema10: ISeriesApi<"Line">; ema20: ISeriesApi<"Line"> } | null>(null);
+  const nifty50SeriesInstance = useRef<{ main: ISeriesApi<"Candlestick">; ema1: ISeriesApi<"Line">; ema2: ISeriesApi<"Line"> } | null>(null);
+
+  // Indicators state
+  const [indicatorsOpen, setIndicatorsOpen] = useState(false);
+  const [ema1Enabled, setEma1Enabled] = useState(true);
+  const [ema1Period, setEma1Period] = useState(10);
+  const [ema2Enabled, setEma2Enabled] = useState(true);
+  const [ema2Period, setEma2Period] = useState(30);
+
+  // Load indicator settings
+  useEffect(() => {
+    const e1e = localStorage.getItem("nifty_ema1_enabled");
+    if (e1e !== null) setEma1Enabled(e1e === "true");
+    const e1p = localStorage.getItem("nifty_ema1_period");
+    if (e1p !== null) setEma1Period(parseInt(e1p, 10));
+    const e2e = localStorage.getItem("nifty_ema2_enabled");
+    if (e2e !== null) setEma2Enabled(e2e === "true");
+    const e2p = localStorage.getItem("nifty_ema2_period");
+    if (e2p !== null) setEma2Period(parseInt(e2p, 10));
+  }, []);
+
+  // Save indicator settings
+  useEffect(() => {
+    localStorage.setItem("nifty_ema1_enabled", String(ema1Enabled));
+    localStorage.setItem("nifty_ema1_period", String(ema1Period));
+    localStorage.setItem("nifty_ema2_enabled", String(ema2Enabled));
+    localStorage.setItem("nifty_ema2_period", String(ema2Period));
+  }, [ema1Enabled, ema1Period, ema2Enabled, ema2Period]);
 
   // Only show charts for symbols in active/waiting trades
   // Stabilize: only return new Set when actual symbol list changes
@@ -287,14 +351,14 @@ export default function ChartPopup({ open, onClose }: Props) {
         wickDownColor: "#d12b2b",
       });
 
-      const ema10 = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 1 });
-      const ema20 = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1 });
+      const ema1 = chart.addSeries(LineSeries, { color: "#2563eb", lineWidth: 1 });
+      const ema2 = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1 });
 
       nifty50ChartInstance.current = chart;
-      nifty50SeriesInstance.current = { main: series, ema10, ema20 };
+      nifty50SeriesInstance.current = { main: series, ema1, ema2 };
     }
 
-    const { main, ema10, ema20 } = nifty50SeriesInstance.current!;
+    const { main, ema1, ema2 } = nifty50SeriesInstance.current!;
 
     const mapped = allCandles
       .map((c) => ({
@@ -316,28 +380,40 @@ export default function ChartPopup({ open, onClose }: Props) {
 
       // EMA overlays
       const closePrices = validCandles.map(c => c.close);
-      const ema10Values = calculateEMA(closePrices, 10);
-      const ema20Values = calculateEMA(closePrices, 20);
-
-      if (ema10Values.length > 0) {
-        ema10.setData(ema10Values.map((val, idx) => ({
-          time: validCandles[idx + (closePrices.length - ema10Values.length)].time,
-          value: val,
-        })));
+      
+      if (ema1Enabled) {
+        const ema1Values = calculateEMA(closePrices, ema1Period);
+        if (ema1Values.length > 0) {
+          ema1.setData(ema1Values.map((val, idx) => ({
+            time: validCandles[idx + (closePrices.length - ema1Values.length)].time,
+            value: val,
+          })));
+        } else {
+          ema1.setData([]);
+        }
+      } else {
+        ema1.setData([]);
       }
 
-      if (ema20Values.length > 0) {
-        ema20.setData(ema20Values.map((val, idx) => ({
-          time: validCandles[idx + (closePrices.length - ema20Values.length)].time,
-          value: val,
-        })));
+      if (ema2Enabled) {
+        const ema2Values = calculateEMA(closePrices, ema2Period);
+        if (ema2Values.length > 0) {
+          ema2.setData(ema2Values.map((val, idx) => ({
+            time: validCandles[idx + (closePrices.length - ema2Values.length)].time,
+            value: val,
+          })));
+        } else {
+          ema2.setData([]);
+        }
+      } else {
+        ema2.setData([]);
       }
     }
 
     return () => {
       // We don't remove chart on every update anymore
     };
-  }, [nifty50Data]);
+  }, [nifty50Data, ema1Enabled, ema1Period, ema2Enabled, ema2Period]);
 
   // Clean up Nifty50 chart on close
   useEffect(() => {
@@ -461,14 +537,14 @@ export default function ChartPopup({ open, onClose }: Props) {
           wickDownColor: "#ea3434",
         });
 
-        const ema10 = chart.addSeries(LineSeries, { color: "#5488fa", lineWidth: 1 });
-        const ema20 = chart.addSeries(LineSeries, { color: "#ffd932", lineWidth: 1 });
+        const ema1 = chart.addSeries(LineSeries, { color: "#5488fa", lineWidth: 1 });
+        const ema2 = chart.addSeries(LineSeries, { color: "#ffd932", lineWidth: 1 });
 
         chartInstances.current[symbol] = chart;
-        seriesInstances.current[symbol] = { main, ema10, ema20 };
+        seriesInstances.current[symbol] = { main, ema1, ema2 };
       }
 
-      const { main, ema10, ema20 } = seriesInstances.current[symbol];
+      const { main, ema1, ema2 } = seriesInstances.current[symbol];
 
       // Filter invalid times, deduplicate, and sort ascending
       const mapped = candles
@@ -496,13 +572,13 @@ export default function ChartPopup({ open, onClose }: Props) {
         const ema20Values = calculateEMA(closePrices, 20);
 
         if (ema10Values.length > 0) {
-          ema10.setData(ema10Values.map((val, idx) => ({
+          ema1.setData(ema10Values.map((val, idx) => ({
             time: validCandles[idx + (closePrices.length - ema10Values.length)].time,
             value: val,
           })));
         }
         if (ema20Values.length > 0) {
-          ema20.setData(ema20Values.map((val, idx) => ({
+          ema2.setData(ema20Values.map((val, idx) => ({
             time: validCandles[idx + (closePrices.length - ema20Values.length)].time,
             value: val,
           })));
@@ -598,6 +674,101 @@ export default function ChartPopup({ open, onClose }: Props) {
               className="w-full rounded-lg overflow-hidden"
               style={{ height: 220, background: "var(--theme-popup-field-bg)", border: "1px solid var(--theme-popup-field-border)" }}
             />
+          )}
+        </div>
+        
+        {/* Indicators Panel */}
+        <div className="mb-4">
+          <div 
+            className="flex items-center justify-between cursor-pointer py-2 px-3 rounded-lg hover:bg-black/5 transition"
+            onClick={() => setIndicatorsOpen(!indicatorsOpen)}
+            style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--theme-popup-field-border)" }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold" style={{ color: "var(--theme-popup-text)" }}>Indicators</span>
+            </div>
+            <button
+              type="button"
+              style={{
+                width: 32,
+                height: 18,
+                borderRadius: 9,
+                background: indicatorsOpen ? "var(--theme-toggle-on, var(--theme-popup-border))" : "var(--theme-toggle-off, var(--theme-popup-field-border))",
+                position: "relative",
+                transition: "background 0.2s",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: indicatorsOpen ? 16 : 2,
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background: "#fff",
+                  transition: "left 0.2s",
+                }}
+              />
+            </button>
+          </div>
+
+          {indicatorsOpen && (
+            <div className="mt-2 p-3 rounded-lg space-y-3" style={{ background: "rgba(0,0,0,0.02)", border: "1px solid var(--theme-popup-field-border)" }}>
+              {/* EMA 1 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={ema1Enabled}
+                    onChange={(e) => setEma1Enabled(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-blue-500"
+                  />
+                  <span className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>EMA 1</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <NumericField
+                    value={ema1Period}
+                    onChange={setEma1Period}
+                    className="w-12 h-7 rounded text-center text-xs font-bold"
+                    style={{
+                      background: "var(--theme-popup-field-bg)",
+                      color: "var(--theme-popup-text)",
+                      border: "1px solid var(--theme-popup-field-border)",
+                    }}
+                    fallback="10"
+                  />
+                </div>
+              </div>
+
+              {/* EMA 2 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={ema2Enabled}
+                    onChange={(e) => setEma2Enabled(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-orange-500"
+                  />
+                  <span className="text-xs font-medium" style={{ color: "var(--theme-popup-text)" }}>EMA 2</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <NumericField
+                    value={ema2Period}
+                    onChange={setEma2Period}
+                    className="w-12 h-7 rounded text-center text-xs font-bold"
+                    style={{
+                      background: "var(--theme-popup-field-bg)",
+                      color: "var(--theme-popup-text)",
+                      border: "1px solid var(--theme-popup-field-border)",
+                    }}
+                    fallback="30"
+                  />
+                </div>
+              </div>
+            </div>
           )}
         </div>
 

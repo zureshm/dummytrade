@@ -3637,14 +3637,17 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
         }
       } else {
         if (effectiveMinTrailing && trade.minTargetLockedPrice === undefined) {
-          updateMinTargetHighWatermark(trade.symbol, minTargetArmPrice);
+          updateMinTargetHighWatermark(trade.symbol, minTargetTriggerPrice);
         }
-        const minTargetHigh = trade.minTargetHighWatermark ?? minTargetArmPrice;
+        const minTargetHigh = trade.minTargetHighWatermark ?? minTargetTriggerPrice;
         const minTargetFloor = (trade.minTargetLockedPrice !== undefined)
           ? trade.minTargetLockedPrice
           : (effectiveMinTrailing ? minTargetHigh - effectiveMinTrigger : trailLevel);
 
-        if (minTargetTriggerPrice <= minTargetFloor) {
+        // Skip trigger check when using candle close and no real candle has arrived since BUY
+        const hasRealCloseAfterBuy = !useCloseForMinTrigger || !lastCandleTimeMap[trade.symbol] || !lastBuyCandleTime[trade.symbol] || lastCandleTimeMap[trade.symbol] !== lastBuyCandleTime[trade.symbol];
+
+        if (hasRealCloseAfterBuy && minTargetTriggerPrice <= minTargetFloor) {
           // If Trailing SL floor is strictly higher than Min Target floor, let Trailing SL execute
           if (effectiveSLEnabled && effectiveSL > 0 && trailedSLLevel > minTargetFloor) {
             // Defer to Trailing SL check below
