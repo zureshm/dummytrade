@@ -127,7 +127,7 @@ function parseCandlesFromLogs(logs: string[]): SymbolCandles {
 
 // Calculate EMA (Exponential Moving Average)
 function calculateEMA(prices: number[], period: number): number[] {
-  if (prices.length < period) return [];
+  if (!Number.isFinite(period) || period < 1 || prices.length < period) return [];
   
   const ema: number[] = [];
   const multiplier = 2 / (period + 1);
@@ -156,7 +156,7 @@ type UTBotSignal = {
 
 // Calculate UTBot Signals
 function calculateUTBot(candles: CandleData[], key: number, atrPeriod: number): UTBotSignal[] {
-  if (candles.length < atrPeriod + 1) return [];
+  if (!Number.isFinite(key) || key <= 0 || !Number.isFinite(atrPeriod) || atrPeriod < 1 || candles.length < atrPeriod + 1) return [];
 
   // 1. Calculate TR (True Range)
   const trs: number[] = [];
@@ -488,7 +488,7 @@ export default function ChartPopup({ open, onClose }: Props) {
     const container = nifty50ChartRef.current;
     if (!container) return;
 
-    const allCandles = [...(nifty50Data.completedCandles || [])];
+    const allCandles = [...(nifty50Data.completedCandles || [])].filter((c) => c != null);
     if (nifty50Data.currentCandle) {
       allCandles.push(nifty50Data.currentCandle);
     }
@@ -538,6 +538,7 @@ export default function ChartPopup({ open, onClose }: Props) {
     const { main, ema1, ema2, markerPlugin } = nifty50SeriesInstance.current!;
 
     const mapped = allCandles
+      .filter((c) => c != null)
       .map((c) => ({
         time: toChartTime(c.time),
         open: c.open,
@@ -774,6 +775,7 @@ export default function ChartPopup({ open, onClose }: Props) {
 
       // Filter invalid times, deduplicate, and sort ascending
       const mapped = candles
+        .filter((c) => c != null)
         .map((c) => ({
           time: toChartTime(c.time),
           open: c.open,
