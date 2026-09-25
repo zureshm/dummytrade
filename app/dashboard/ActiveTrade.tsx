@@ -59,7 +59,6 @@ type Props = {
   waitingTrades: WaitingTrade[];
   activeLtps: Record<string, number>;
   isHydrated: boolean;
-  strategyLastCandleTime?: string;
   onManualExit: (symbol: string, exitPrice: string, pnl: number, lastCandleTime: string) => void;
   onCancelWaiting: (symbol: string) => void;
 };
@@ -124,6 +123,8 @@ export default function ActiveTrade({
     let label = "SIDEWAYS", color = "#a855f7";
     if (ru.includes("UP") || ru.includes("BULL")) { label = "UPWARDS"; color = "#22c55e"; }
     else if (ru.includes("DOWN") || ru.includes("BEAR")) { label = "DOWNWARDS"; color = "#ef4444"; }
+    else if (ru === "CHOPPY" || ru === "CHOP") { label = "CHOPPY"; color = "#ec4899"; }
+    else if (ru === "TRADEABLE") { label = "TRADEABLE"; color = "#06b6d4"; }
     return <span style={{ marginLeft, background: color, color: "#fff", fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4 }}>{label}</span>;
   };
 
@@ -141,38 +142,11 @@ export default function ActiveTrade({
             body: JSON.stringify({ symbol, enabled: !enabled }),
           }).catch(() => {});
         }}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "4px",
-          cursor: "pointer",
-          border: "none",
-          background: "transparent",
-          padding: 0,
-          fontSize: 10,
-          fontWeight: 600,
-          color: enabled ? "var(--theme-popup-border)" : "#6b7280",
-        }}
+        className={`${styles.aiToggle} ${enabled ? styles.enabled : ""}`}
         aria-label={enabled ? "AI Guard ON — click to disable" : "AI Guard OFF — click to enable"}
       >
-        <span style={{
-          position: "relative",
-          width: 24,
-          height: 14,
-          borderRadius: 7,
-          background: enabled ? "var(--theme-popup-border)" : "#ccc",
-          transition: "background 0.15s",
-        }}>
-          <span style={{
-            position: "absolute",
-            top: 2,
-            left: enabled ? 12 : 2,
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: "#fff",
-            transition: "left 0.15s",
-          }} />
+        <span className={styles.aiToggleTrack}>
+          <span className={styles.aiToggleThumb} />
         </span>
         AI
       </button>
@@ -321,6 +295,12 @@ export default function ActiveTrade({
                 } else if (ru.includes("DOWN") || ru.includes("BEAR")) {
                   themeColor = "#ef4444"; // DOWNWARDS (Red)
                   label = "AI suggests ending cycle";
+                } else if (ru === "CHOPPY" || ru === "CHOP") {
+                  themeColor = "#ec4899"; // CHOPPY (Pink)
+                  label = "AI suggests CHOPPY — exit";
+                } else if (ru === "TRADEABLE") {
+                  themeColor = "#06b6d4"; // TRADEABLE (Cyan)
+                  label = "AI confirms TRADEABLE";
                 }
 
                 return (
@@ -359,7 +339,7 @@ export default function ActiveTrade({
                       </button>
                       )}
                       <button
-                        className={`${styles.waitingBtn} ${styles.danger}`}
+                        className={`${styles.waitingBtn} ${styles.danger} ai-dismiss-btn`}
                         type="button"
                         style={{ padding: "2px 8px", fontSize: "11px" }}
                         onClick={() => {
@@ -493,111 +473,132 @@ export default function ActiveTrade({
               const errorMessage = "History fetch failed (0 candles). Strategy may not work correctly without history. Remove and re-add, or keep with limited accuracy.";
 
               return showError ? (
-                <div key={`pending-${t.symbol}`} style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "8px 10px", borderRadius: "6px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", marginBottom: "6px" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-                    <AlertTriangle className="w-4 h-4" style={{ color: "#f59e0b", flexShrink: 0, marginTop: "1px" }} />
-                    <div style={{ flex: 1, fontSize: "12px", lineHeight: "16px" }}>
-                      <span style={{ fontWeight: 600, color: "#f59e0b" }}>{t.symbol}</span>
-                      <span style={{ color: "var(--theme-text-gray-500)", marginLeft: "6px" }}>— {errorMessage}</span>
+                <div key={`pending-${t.symbol}`} className={styles.pendingBanner} style={{ borderColor: "rgba(245,158,11,0.25)", background: "rgba(245,158,11,0.04)" }}>
+                  <div className={styles.loadingBarContainer} style={{ background: "rgba(245,158,11,0.1)", borderColor: "rgba(245,158,11,0.2)" }}>
+                    <div className={styles.loadingBar} style={{ width: "100%", background: "#f59e0b", opacity: 0.6 }} />
+                    <div className={styles.errorContent} style={{ color: "#fef3c7" }}>
+                      <span className={styles.errorIconBox}>
+                        <AlertTriangle className="w-4 h-4" />
+                      </span>
+                      <span className={styles.errorMarquee}>
+                        <span className={styles.errorMarqueeInner}>
+                          <span>{errorMessage}</span>
+                          <span aria-hidden="true">{errorMessage}</span>
+                        </span>
+                      </span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: "6px", marginLeft: "26px" }}>
-                    <button
-                      className={`${styles.waitingBtn} ${styles.danger}`}
-                      type="button"
-                      style={{ padding: "2px 8px", fontSize: "11px" }}
-                      onClick={() => {
-                        fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/cancel`, { method: "POST" }).catch(() => {});
-                        onCancelWaiting(t.symbol);
-                      }}
-                    >
-                      <XCircle className="w-3 h-3" />
-                      Remove
-                    </button>
-                    {historyFailed && (
+                  <div className={styles.bannerBottom}>
+                    <span className={styles.bannerSymbol} style={{ color: "#f59e0b" }}>
+                      {t.symbol}
+                      {t.symbol.endsWith("CE") && (
+                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 3, background: "rgba(0,0,0,0)", marginLeft: 2, flexShrink: 0 }}>
+                          <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 11,11 1,11" fill="#2e9e2e" /></svg>
+                        </span>
+                      )}
+                      {t.symbol.endsWith("PE") && (
+                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 3, background: "rgba(0,0,0,0)", marginLeft: 2, flexShrink: 0 }}>
+                          <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,11 11,1 1,1" fill="#ff0000" /></svg>
+                        </span>
+                      )}
+                    </span>
+                    <div className={styles.bannerActions}>
                       <button
-                        className={`${styles.waitingBtn} ${styles.dark}`}
+                        className={`${styles.waitingBtn} ${styles.danger}`}
                         type="button"
                         style={{ padding: "2px 8px", fontSize: "11px" }}
                         onClick={() => {
-                          // Force symbol into initialized set — user accepts limited accuracy
+                          fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/cancel`, { method: "POST" }).catch(() => {});
+                          onCancelWaiting(t.symbol);
+                        }}
+                      >
+                        <XCircle className="w-3 h-3" />
+                        <span>Remove</span>
+                      </button>
+                      {historyFailed && (
+                        <button
+                          className={`${styles.waitingBtn} ${styles.dark} keep-anyway-btn`}
+                          type="button"
+                          style={{ padding: "2px 8px", fontSize: "11px" }}
+                          onClick={() => {
+                            fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-init`, { method: "POST" }).catch(() => {});
+                          }}
+                        >
+                          <span>Keep anyway</span>
+                        </button>
+                      )}
+                      <button
+                        className={`${styles.waitingBtn} ${styles.dark}`}
+                        type="button"
+                        title="Force Init — skip history and mark as ready"
+                        style={{ padding: "2px 6px", fontSize: "11px", background: "rgba(99,102,241,0.15)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.3)" }}
+                        onClick={() => {
                           fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-init`, { method: "POST" }).catch(() => {});
                         }}
                       >
-                        Keep anyway
+                        <Play className="w-3 h-3" />
+                        <span>Force&nbsp;Init</span>
                       </button>
-                    )}
-                    <button
-                      className={`${styles.waitingBtn} ${styles.dark}`}
-                      type="button"
-                      title="Force Init — skip history and mark as ready"
-                      style={{ padding: "2px 6px", fontSize: "11px", background: "rgba(99,102,241,0.15)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.3)" }}
-                      onClick={() => {
-                        fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-init`, { method: "POST" }).catch(() => {});
-                      }}
-                    >
-                      <Play className="w-3 h-3" />
-                      Force&nbsp;Init
-                    </button>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div key={`pending-${t.symbol}`} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "6px", background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 500, flexShrink: 0 }}>{t.symbol}
-                    {t.symbol.endsWith("CE") && (
-                      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 3, background: "rgba(0,0,0,0)", marginLeft: 2, flexShrink: 0 }}>
-                        <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 11,11 1,11" fill="#2e9e2e" /></svg>
-                      </span>
-                    )}
-                    {t.symbol.endsWith("PE") && (
-                      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 3, background: "rgba(0,0,0,0)", marginLeft: 2, flexShrink: 0 }}>
-                        <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,11 11,1 1,1" fill="#ff0000" /></svg>
-                      </span>
-                    )}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "11px", color: "var(--theme-text-gray-500)", marginBottom: "4px" }}>
-                      {historyFailed ? "Retrying history fetch..." : "Initializing strategy engine..."}
-                    </div>
-                    <div style={{ height: 3, borderRadius: 2, background: "rgba(99,102,241,0.15)", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%",
-                        borderRadius: 2,
-                        background: "#6366f1",
-                        width: `${(() => {
-                          const cycleMs = historyFailed ? 30000 : 5000;
-                          const elapsed = nowMs - (addedAtMap[t.symbol] ?? nowMs);
-                          const cycleProgress = (elapsed % cycleMs) / cycleMs;
-                          return Math.min(cycleProgress * 100, 100);
-                        })()}%`,
-                        transition: "width 0.3s linear",
-                      }} />
+                <div key={`pending-${t.symbol}`} className={styles.pendingBanner}>
+                  <div className={styles.loadingBarContainer}>
+                    <div className={styles.loadingBar} style={{ 
+                      width: `${(() => {
+                        const cycleMs = 5000;
+                        const elapsed = nowMs - (addedAtMap[t.symbol] ?? nowMs);
+                        const cycleProgress = (elapsed % cycleMs) / cycleMs;
+                        return Math.min(cycleProgress * 100, 100);
+                      })()}%`,
+                      background: "var(--theme-status-waiting)"
+                    }} />
+                    <span className={styles.loadingText}>
+                      {historyFailed ? "RETRYING HISTORY FETCH..." : "INITIALIZING STRATEGY ENGINE..."}
+                    </span>
+                  </div>
+                  <div className={styles.bannerBottom}>
+                    <span className={styles.bannerSymbol}>
+                      {t.symbol}
+                      {t.symbol.endsWith("CE") && (
+                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 3, background: "rgba(0,0,0,0)", marginLeft: 2, flexShrink: 0 }}>
+                          <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 11,11 1,11" fill="#2e9e2e" /></svg>
+                        </span>
+                      )}
+                      {t.symbol.endsWith("PE") && (
+                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 3, background: "rgba(0,0,0,0)", marginLeft: 2, flexShrink: 0 }}>
+                          <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,11 11,1 1,1" fill="#ff0000" /></svg>
+                        </span>
+                      )}
+                    </span>
+                    <div className={styles.bannerActions}>
+                      <button
+                        className={`${styles.waitingBtn} ${styles.dark}`}
+                        type="button"
+                        title="Force Init — skip history and mark as ready"
+                        style={{ padding: "2px 6px", fontSize: "11px" }}
+                        onClick={() => {
+                          fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-init`, { method: "POST" }).catch(() => {});
+                        }}
+                      >
+                        <Play className="w-3 h-3" />
+                        <span>Force&nbsp;Init</span>
+                      </button>
+                      <button
+                        className={`${styles.waitingBtn} ${styles.danger}`}
+                        type="button"
+                        style={{ padding: "2px 8px", fontSize: "11px" }}
+                        onClick={() => {
+                          fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/cancel`, { method: "POST" }).catch(() => {});
+                          onCancelWaiting(t.symbol);
+                        }}
+                      >
+                        <XCircle className="w-3 h-3" />
+                        <span>Cancel</span>
+                      </button>
                     </div>
                   </div>
-                  <button
-                    className={`${styles.waitingBtn} ${styles.dark}`}
-                    type="button"
-                    title="Force Init — skip history and mark as ready"
-                    style={{ flexShrink: 0, padding: "2px 6px", fontSize: "11px", background: "rgba(99,102,241,0.15)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.3)" }}
-                    onClick={() => {
-                      fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/force-init`, { method: "POST" }).catch(() => {});
-                    }}
-                  >
-                    <Play className="w-3 h-3" />
-                    Force&nbsp;Init
-                  </button>
-                  <button
-                    className={`${styles.waitingBtn} ${styles.danger}`}
-                    type="button"
-                    style={{ flexShrink: 0, padding: "2px 8px", fontSize: "11px" }}
-                    onClick={() => {
-                      fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/cancel`, { method: "POST" }).catch(() => {});
-                      onCancelWaiting(t.symbol);
-                    }}
-                  >
-                    <XCircle className="w-3 h-3" />
-                    Cancel
-                  </button>
                 </div>
               );
             });
@@ -713,6 +714,12 @@ export default function ActiveTrade({
                   } else if (ru.includes("DOWN") || ru.includes("BEAR")) {
                     themeColor = "#ef4444"; // DOWNWARDS (Red)
                     label = "AI blocked entry (Downwards)";
+                  } else if (ru === "CHOPPY" || ru === "CHOP") {
+                    themeColor = "#ec4899"; // CHOPPY (Pink)
+                    label = "AI blocked entry (Choppy)";
+                  } else if (ru === "TRADEABLE") {
+                    themeColor = "#06b6d4"; // TRADEABLE (Cyan)
+                    label = "AI confirms TRADEABLE";
                   }
 
                   return (
