@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useCallback, useMemo, useRef, useState } from "react";
+import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type TradeSelection = {
   symbol: string;
@@ -226,6 +226,8 @@ type TradeStoreValue = {
   setSelection: (s: TradeSelection) => void;
   forceBuyEnabled: boolean;
   setForceBuyEnabled: (v: boolean) => void;
+  desktopViewEnabled: boolean;
+  setDesktopViewEnabled: (v: boolean) => void;
 
   waitingTrades: WaitingTrade[];
   addWaitingTradeFromSelection: () => void;
@@ -336,6 +338,21 @@ export function TradeStoreProvider({
 }) {
   const [selection, setSelection] = useState<TradeSelection>(null);
   const [forceBuyEnabled, setForceBuyEnabled] = useState(false);
+  const [desktopViewEnabled, setDesktopViewEnabledState] = useState(false);
+
+  // Hydrate desktop view preference from localStorage (client-only)
+  useEffect(() => {
+    try {
+      setDesktopViewEnabledState(localStorage.getItem("dummy_desktopView") === "1");
+    } catch {}
+  }, []);
+
+  const setDesktopViewEnabled = useCallback((v: boolean) => {
+    setDesktopViewEnabledState(v);
+    try {
+      localStorage.setItem("dummy_desktopView", v ? "1" : "0");
+    } catch {}
+  }, []);
 
   // Server JSON file is the single source of truth — start empty, syncFromServer fills it
   const [waitingTrades, setWaitingTrades] = useState<WaitingTrade[]>([]);
@@ -961,6 +978,8 @@ export function TradeStoreProvider({
       setSelection,
       forceBuyEnabled,
       setForceBuyEnabled,
+      desktopViewEnabled,
+      setDesktopViewEnabled,
       waitingTrades,
       addWaitingTradeFromSelection,
       removeWaitingTrade,
@@ -991,7 +1010,7 @@ export function TradeStoreProvider({
       aiSymbolEnabled,
     }),
     [
-      selection, forceBuyEnabled, waitingTrades, activeTrades, tradeHistory,
+      selection, forceBuyEnabled, desktopViewEnabled, waitingTrades, activeTrades, tradeHistory,
       syncFromServer, initializedSymbols, symbolHistoryStatus, aiSuggestions,
       aiGuardActive, aiSymbolEnabled, aiRegime,
       activateWaitingTrade, addTradeHistoryEntry, addWaitingTradeFromSelection,

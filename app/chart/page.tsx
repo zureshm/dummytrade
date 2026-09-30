@@ -24,6 +24,8 @@ import {
   UTBotLabel,
   CandleData,
   isWithinMarketHours,
+  cacheNiftySessionCandles,
+  loadCachedNiftySession,
 } from "@/lib/strategy-chart";
 
 const lsNum = (key: string, fallback: number) => {
@@ -148,9 +150,14 @@ function StrategyChartPage() {
             const currentC = msg.currentCandle && isWithinMarketHours(msg.currentCandle.time) ? msg.currentCandle : null;
 
             setCandles((prev) => {
-              // Sticky guard: don't wipe on empty (after hours)
-              if (incoming.length === 0 && !currentC && prev.length > 0) return prev;
-              
+              // Sticky guard: don't wipe on empty (after hours / junk-only feed)
+              if (incoming.length === 0 && !currentC) {
+                if (prev.length > 0) return prev;
+                const cached = loadCachedNiftySession();
+                if (cached) return cached;
+                return prev;
+              }
+              cacheNiftySessionCandles(incoming);
               const all = [...incoming];
               if (currentC) all.push(currentC);
               return all;

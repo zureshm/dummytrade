@@ -16,6 +16,8 @@ import {
   UTBotLabelsPrimitive,
   toChartTime,
   isWithinMarketHours,
+  cacheNiftySessionCandles,
+  loadCachedNiftySession,
 } from "@/lib/strategy-chart";
 
 interface NumericFieldProps extends Omit<React.ComponentProps<"input">, "value" | "onChange"> {
@@ -396,9 +398,12 @@ export default function ChartPopup({ open, onClose }: Props) {
 
             setNifty50Data((prev) => {
               // Sticky guard: if incoming data is filtered out entirely but we have data, keep the old data
-              if (incomingCompleted.length === 0 && !incomingCurrent && prev.completedCandles.length > 0) {
-                return prev;
+              if (incomingCompleted.length === 0 && !incomingCurrent) {
+                if (prev.completedCandles.length > 0) return prev;
+                const cached = loadCachedNiftySession();
+                return cached ? { completedCandles: cached, currentCandle: null } : prev;
               }
+              cacheNiftySessionCandles(incomingCompleted);
               return {
                 completedCandles: incomingCompleted,
                 currentCandle: incomingCurrent,
