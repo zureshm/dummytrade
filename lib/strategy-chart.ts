@@ -439,32 +439,3 @@ export function isWithinMarketHours(timeStr: string | number): boolean {
   const totalMinutes = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
   return totalMinutes >= 9 * 60 && totalMinutes <= 15 * 60 + 30;
 }
-
-// ---- Nifty50 last-session cache ----
-// After market close the feed buffer can fill with flat heartbeat candles,
-// evicting the real session from the payload. Persist the last valid session
-// so the chart can restore it instead of showing an empty "waiting" state.
-const NIFTY_SESSION_CACHE_KEY = "nifty50_last_session_v1";
-let lastCachedNiftyTime: string | number | null = null;
-
-export function cacheNiftySessionCandles(candles: CandleData[]): void {
-  if (typeof window === "undefined" || candles.length === 0) return;
-  const lastTime = candles[candles.length - 1].time;
-  if (lastTime === lastCachedNiftyTime) return;
-  lastCachedNiftyTime = lastTime;
-  try {
-    localStorage.setItem(NIFTY_SESSION_CACHE_KEY, JSON.stringify(candles.slice(-700)));
-  } catch {}
-}
-
-export function loadCachedNiftySession(): CandleData[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(NIFTY_SESSION_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as CandleData[]) : null;
-  } catch {
-    return null;
-  }
-}
