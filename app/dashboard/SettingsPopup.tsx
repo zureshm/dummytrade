@@ -7,6 +7,7 @@ import { playSound, setVolume } from "@/lib/sounds";
 import { BASE_PATH } from "@/lib/basePath";
 import { useTheme } from "@/components/ThemeProvider";
 import { useTradeStore } from "../store/TradeStore";
+import { useSharedAiSettings } from "@/lib/useSharedAiSettings";
 
 interface ClampedNumericFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
   value: number;
@@ -103,17 +104,19 @@ export default function SettingsPopup({ open, onClose }: Props) {
   const autoCutoffDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // AI Guard settings
-  const [aiGuardEnabled, setAiGuardEnabled] = useState(false);
-  const [aiEntryGuardEnabled, setAiEntryGuardEnabled] = useState(false);
-  const [aiAutoExitEnabled, setAiAutoExitEnabled] = useState(false);
-  const [aiCandlesCount, setAiCandlesCount] = useState(90);
-  const [aiRecentCandlesCount, setAiRecentCandlesCount] = useState(30);
-  const [aiEntryBufferMaxCandles, setAiEntryBufferMaxCandles] = useState(1);
-  const [aiConsiderVolume, setAiConsiderVolume] = useState(false);
-  const [aiUseHeikinAshi, setAiUseHeikinAshi] = useState(true);
-  const [aiProvider, setAiProvider] = useState("local");
-  const [aiModel, setAiModel] = useState("openai/gpt-oss-120b");
-  const [aiApiKey, setAiApiKey] = useState("");
+  const { settings: aiSettings, updateSettings: updateAiSettings } = useSharedAiSettings();
+
+  const aiGuardEnabled = aiSettings.enabled;
+  const aiEntryGuardEnabled = aiSettings.entryGuardEnabled;
+  const aiAutoExitEnabled = aiSettings.autoExitEnabled;
+  const aiCandlesCount = aiSettings.candlesCount;
+  const aiRecentCandlesCount = aiSettings.recentCandlesCount;
+  const aiEntryBufferMaxCandles = aiSettings.entryBufferMaxCandles;
+  const aiConsiderVolume = aiSettings.considerVolume;
+  const aiUseHeikinAshi = aiSettings.useHeikinAshi;
+  const aiProvider = aiSettings.provider;
+  const aiModel = aiSettings.model;
+  const aiApiKey = aiSettings.apiKey;
 
   // AI Guard info tooltips
   const [isEntryGuardInfoOpen, setIsEntryGuardInfoOpen] = useState(false);
@@ -178,18 +181,19 @@ export default function SettingsPopup({ open, onClose }: Props) {
       .then((r) => r.json())
       .then((data) => {
         if (data && typeof data === "object") {
-          setAiGuardEnabled(Boolean(data.enabled));
-          setAiEntryGuardEnabled(Boolean(data.entryGuardEnabled));
-          setAiAutoExitEnabled(Boolean(data.autoExitEnabled));
-          if (typeof data.candlesCount === "number") setAiCandlesCount(data.candlesCount);
-          if (typeof data.recentCandlesCount === "number") setAiRecentCandlesCount(data.recentCandlesCount);
-          if (typeof data.entryBufferMaxCandles === "number") setAiEntryBufferMaxCandles(data.entryBufferMaxCandles);
-          if (typeof data.considerVolume === "boolean") setAiConsiderVolume(data.considerVolume);
-          if (typeof data.useHeikinAshi === "boolean") setAiUseHeikinAshi(data.useHeikinAshi);
-          if (typeof data.provider === "string") setAiProvider(data.provider);
-          if (typeof data.model === "string") setAiModel(data.model);
-          if (Array.isArray(data.apiKeys)) setAiApiKey(data.apiKeys.join("\n"));
-          else if (typeof data.apiKey === "string") setAiApiKey(data.apiKey);
+          updateAiSettings({
+            enabled: Boolean(data.enabled),
+            entryGuardEnabled: Boolean(data.entryGuardEnabled),
+            autoExitEnabled: Boolean(data.autoExitEnabled),
+            candlesCount: typeof data.candlesCount === "number" ? data.candlesCount : 120,
+            recentCandlesCount: typeof data.recentCandlesCount === "number" ? data.recentCandlesCount : 30,
+            entryBufferMaxCandles: typeof data.entryBufferMaxCandles === "number" ? data.entryBufferMaxCandles : 1,
+            considerVolume: typeof data.considerVolume === "boolean" ? data.considerVolume : false,
+            useHeikinAshi: typeof data.useHeikinAshi === "boolean" ? data.useHeikinAshi : true,
+            provider: typeof data.provider === "string" ? data.provider : "local",
+            model: typeof data.model === "string" ? data.model : "openai/gpt-oss-120b",
+            apiKey: Array.isArray(data.apiKeys) ? data.apiKeys.join("\n") : (typeof data.apiKey === "string" ? data.apiKey : ""),
+          });
           // Sync to localStorage as cache
           localStorage.setItem("dummy_aiGuardEnabled", String(data.enabled));
           localStorage.setItem("dummy_aiEntryGuardEnabled", String(data.entryGuardEnabled));
@@ -207,47 +211,37 @@ export default function SettingsPopup({ open, onClose }: Props) {
       .catch(() => {
         // Server unreachable — fall back to localStorage
         const aiGuard = localStorage.getItem("dummy_aiGuardEnabled");
-        if (aiGuard) setAiGuardEnabled(aiGuard === "true");
         const aiEntry = localStorage.getItem("dummy_aiEntryGuardEnabled");
-        if (aiEntry) setAiEntryGuardEnabled(aiEntry === "true");
         const aiAutoExit = localStorage.getItem("dummy_aiAutoExitEnabled");
-        if (aiAutoExit) setAiAutoExitEnabled(aiAutoExit === "true");
         const aiCandles = localStorage.getItem("dummy_aiCandlesCount");
-        if (aiCandles) setAiCandlesCount(parseInt(aiCandles, 10));
         const aiRecentCandles = localStorage.getItem("dummy_aiRecentCandlesCount");
-        if (aiRecentCandles) setAiRecentCandlesCount(parseInt(aiRecentCandles, 10));
         const aiEntryBuffer = localStorage.getItem("dummy_aiEntryBufferMaxCandles");
-        if (aiEntryBuffer) setAiEntryBufferMaxCandles(parseInt(aiEntryBuffer, 10));
         const aiVol = localStorage.getItem("dummy_aiConsiderVolume");
-        if (aiVol) setAiConsiderVolume(aiVol === "true");
         const aiHA = localStorage.getItem("dummy_aiUseHeikinAshi");
-        if (aiHA) setAiUseHeikinAshi(aiHA === "true");
         const aiProv = localStorage.getItem("dummy_aiProvider");
-        if (aiProv) setAiProvider(aiProv);
         const aiMdl = localStorage.getItem("dummy_aiModel");
-        if (aiMdl) setAiModel(aiMdl);
         const aiKey = localStorage.getItem("dummy_aiApiKey");
-        if (aiKey) setAiApiKey(aiKey);
+        
+        updateAiSettings({
+          enabled: aiGuard === "true" ? true : false,
+          entryGuardEnabled: aiEntry === "true" ? true : false,
+          autoExitEnabled: aiAutoExit === "true" ? true : false,
+          candlesCount: aiCandles ? parseInt(aiCandles, 10) : 120,
+          recentCandlesCount: aiRecentCandles ? parseInt(aiRecentCandles, 10) : 30,
+          entryBufferMaxCandles: aiEntryBuffer ? parseInt(aiEntryBuffer, 10) : 1,
+          considerVolume: aiVol === "true" ? true : false,
+          useHeikinAshi: aiHA === "true" ? true : true,
+          provider: aiProv || "local",
+          model: aiMdl || "openai/gpt-oss-120b",
+          apiKey: aiKey || "",
+        });
       })
       .finally(() => {
         aiSettingsLoadedRef.current = true;
       });
   }, []);
 
-  // Persist AI Guard settings to localStorage when they change
-  useEffect(() => {
-    localStorage.setItem("dummy_aiGuardEnabled", String(aiGuardEnabled));
-    localStorage.setItem("dummy_aiEntryGuardEnabled", String(aiEntryGuardEnabled));
-    localStorage.setItem("dummy_aiAutoExitEnabled", String(aiAutoExitEnabled));
-    localStorage.setItem("dummy_aiCandlesCount", String(aiCandlesCount));
-    localStorage.setItem("dummy_aiRecentCandlesCount", String(aiRecentCandlesCount));
-    localStorage.setItem("dummy_aiEntryBufferMaxCandles", String(aiEntryBufferMaxCandles));
-    localStorage.setItem("dummy_aiConsiderVolume", String(aiConsiderVolume));
-    localStorage.setItem("dummy_aiUseHeikinAshi", String(aiUseHeikinAshi));
-    localStorage.setItem("dummy_aiProvider", aiProvider);
-    localStorage.setItem("dummy_aiModel", aiModel);
-    localStorage.setItem("dummy_aiApiKey", aiApiKey);
-  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiEntryBufferMaxCandles, aiConsiderVolume, aiUseHeikinAshi, aiProvider, aiModel, aiApiKey]);
+
 
   // POST AI Guard settings to backend (debounced, only after initial server load)
   const postAiSettings = useCallback(() => {
@@ -258,21 +252,21 @@ export default function SettingsPopup({ open, onClose }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          enabled: aiGuardEnabled,
-          entryGuardEnabled: aiEntryGuardEnabled,
-          autoExitEnabled: aiAutoExitEnabled,
-          candlesCount: aiCandlesCount,
-          recentCandlesCount: aiRecentCandlesCount,
-          entryBufferMaxCandles: aiEntryBufferMaxCandles,
-          considerVolume: aiConsiderVolume,
-          useHeikinAshi: aiUseHeikinAshi,
-          provider: aiProvider,
-          model: aiModel,
-          apiKeys: aiApiKey,
+          enabled: aiSettings.enabled,
+          entryGuardEnabled: aiSettings.entryGuardEnabled,
+          autoExitEnabled: aiSettings.autoExitEnabled,
+          candlesCount: aiSettings.candlesCount,
+          recentCandlesCount: aiSettings.recentCandlesCount,
+          entryBufferMaxCandles: aiSettings.entryBufferMaxCandles,
+          considerVolume: aiSettings.considerVolume,
+          useHeikinAshi: aiSettings.useHeikinAshi,
+          provider: aiSettings.provider,
+          model: aiSettings.model,
+          apiKeys: aiSettings.apiKey,
         }),
       }).catch(() => {});
     }, 500);
-  }, [aiGuardEnabled, aiEntryGuardEnabled, aiAutoExitEnabled, aiCandlesCount, aiRecentCandlesCount, aiEntryBufferMaxCandles, aiConsiderVolume, aiUseHeikinAshi, aiProvider, aiModel, aiApiKey]);
+  }, [aiSettings]);
 
   useEffect(() => { postAiSettings(); }, [postAiSettings]);
 
@@ -299,7 +293,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
 
   // Test API key when it changes (or provider changes)
   const testAiConnection = useCallback(async () => {
-    if (!aiApiKey) {
+    if (!aiSettings.apiKey) {
       setAiTestStatus("idle");
       return;
     }
@@ -309,7 +303,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
       const res = await fetch(`${BASE_PATH}/api/ai/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: aiProvider, apiKeys: aiApiKey, model: aiModel }),
+        body: JSON.stringify({ provider: aiSettings.provider, apiKeys: aiSettings.apiKey, model: aiSettings.model }),
       });
       const data = await res.json();
       if (data.connected) {
@@ -322,21 +316,21 @@ export default function SettingsPopup({ open, onClose }: Props) {
       setAiTestStatus("failed");
       setAiTestError("Cannot reach server");
     }
-  }, [aiApiKey, aiProvider, aiModel]);
+  }, [aiSettings]);
 
   useEffect(() => {
-    if (aiProvider === "local" || aiProvider === "local_v2" || aiProvider === "local_v3" || aiProvider === "local_v4") {
+    if (aiSettings.provider === "local" || aiSettings.provider === "local_v2" || aiSettings.provider === "local_v3" || aiSettings.provider === "local_v4") {
       setAiTestStatus("idle");
       return;
     }
-    if (aiApiKey && (aiApiKey !== aiPrevKeyRef.current || aiProvider !== aiPrevProviderRef.current || aiModel !== aiPrevModelRef.current)) {
-      aiPrevKeyRef.current = aiApiKey;
-      aiPrevProviderRef.current = aiProvider;
-      aiPrevModelRef.current = aiModel;
+    if (aiSettings.apiKey && (aiSettings.apiKey !== aiPrevKeyRef.current || aiSettings.provider !== aiPrevProviderRef.current || aiSettings.model !== aiPrevModelRef.current)) {
+      aiPrevKeyRef.current = aiSettings.apiKey;
+      aiPrevProviderRef.current = aiSettings.provider;
+      aiPrevModelRef.current = aiSettings.model;
       const timer = setTimeout(() => { testAiConnection(); }, 800);
       return () => clearTimeout(timer);
     }
-  }, [aiApiKey, aiProvider, aiModel, testAiConnection]);
+  }, [aiSettings, testAiConnection]);
 
   // Fetch current strategy info when popup opens
   useEffect(() => {
@@ -804,7 +798,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setAiGuardEnabled(!aiGuardEnabled)}
+                  onClick={() => updateAiSettings({ enabled: !aiGuardEnabled })}
                   style={{
                     width: 44,
                     height: 24,
@@ -865,7 +859,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setAiEntryGuardEnabled(!aiEntryGuardEnabled)}
+                        onClick={() => updateAiSettings({ entryGuardEnabled: !aiEntryGuardEnabled })}
                         style={{
                           width: 36,
                           height: 20,
@@ -921,7 +915,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setAiAutoExitEnabled(!aiAutoExitEnabled)}
+                        onClick={() => updateAiSettings({ autoExitEnabled: !aiAutoExitEnabled })}
                         style={{
                           width: 36,
                           height: 20,
@@ -977,7 +971,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                       </div>
                       <ClampedNumericField
                         value={aiCandlesCount}
-                        onChange={setAiCandlesCount}
+                        onChange={(val) => updateAiSettings({ candlesCount: val })}
                         min={30}
                         max={120}
                         className="w-16 h-7 px-2 rounded-lg text-xs text-center"
@@ -999,7 +993,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                       </div>
                       <ClampedNumericField
                         value={aiRecentCandlesCount}
-                        onChange={setAiRecentCandlesCount}
+                        onChange={(val) => updateAiSettings({ recentCandlesCount: val })}
                         min={10}
                         max={60}
                         className="w-16 h-7 px-2 rounded-lg text-xs text-center"
@@ -1022,7 +1016,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                       <div className="flex items-center gap-2">
                         <ClampedNumericField
                           value={aiEntryBufferMaxCandles}
-                          onChange={setAiEntryBufferMaxCandles}
+                          onChange={(val) => updateAiSettings({ entryBufferMaxCandles: val })}
                           min={1}
                           max={10}
                           className="w-16 h-7 px-2 rounded-lg text-xs text-center"
@@ -1044,7 +1038,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                       <label className="text-xs font-semibold" style={{ color: "var(--theme-popup-text)" }}>Consider Volume</label>
                       <button
                         type="button"
-                        onClick={() => setAiConsiderVolume(!aiConsiderVolume)}
+                        onClick={() => updateAiSettings({ considerVolume: !aiConsiderVolume })}
                         style={{
                           width: 36,
                           height: 20,
@@ -1083,7 +1077,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                       <label className="text-xs font-semibold" style={{ color: "var(--theme-popup-text)" }}>Heikin-Ashi Smoothing</label>
                       <button
                         type="button"
-                        onClick={() => setAiUseHeikinAshi(!aiUseHeikinAshi)}
+                        onClick={() => updateAiSettings({ useHeikinAshi: !aiUseHeikinAshi })}
                         style={{
                           width: 36,
                           height: 20,
@@ -1155,7 +1149,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                     </div>
                     <select
                       value={aiProvider}
-                      onChange={(e) => setAiProvider(e.target.value)}
+                      onChange={(e) => updateAiSettings({ provider: e.target.value })}
                       className="w-full h-9 px-3 rounded-lg text-xs"
                       style={{
                         background: "var(--theme-popup-field-bg)",
@@ -1181,7 +1175,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                     </div>
                     <select
                       value={aiModel}
-                      onChange={(e) => setAiModel(e.target.value)}
+                      onChange={(e) => updateAiSettings({ model: e.target.value })}
                       className="w-full h-9 px-3 rounded-lg text-xs"
                       style={{
                         background: "var(--theme-popup-field-bg)",
@@ -1223,7 +1217,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
                     </div>
                     <textarea
                       value={aiApiKey}
-                      onChange={(e) => setAiApiKey(e.target.value)}
+                      onChange={(e) => updateAiSettings({ apiKey: e.target.value })}
                       placeholder={`Paste your ${aiProvider === "claude" ? "Claude" : "Groq"} API key(s) here — one per line`}
                       rows={3}
                       className="w-full px-3 py-2 rounded-lg text-xs resize-vertical"
