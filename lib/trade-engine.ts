@@ -39,6 +39,7 @@ const STRATEGY_URL = process.env.NEXT_PUBLIC_STRATEGY_API_URL!;
 
 
 const DB_PATH = path.join(process.cwd(), "data", "trades.json");
+const HISTORY_DB_PATH = path.join(process.cwd(), "data", "history.json");
 
 
 
@@ -358,6 +359,8 @@ type ActiveTrade = {
   reEntryMinTargetPoints: number;
   reEntryMinTargetTrigger: number;
   reEntryMinTargetTrailing: boolean;
+  watchdogMaxGain?: number;
+  watchdogArmedCheckpoint?: number;
   isReEntryCycle?: boolean;
   reEntryExitPrice?: number;
   reEntrySellTime?: string;
@@ -559,6 +562,52 @@ export function setAutoCutoffSettings(settings: {
   if (settings.autoCutoffHours !== undefined) autoCutoffHours = settings.autoCutoffHours;
   if (settings.autoCutoffMinutes !== undefined) autoCutoffMinutes = settings.autoCutoffMinutes;
   if (settings.autoCutoffAmpm !== undefined) autoCutoffAmpm = settings.autoCutoffAmpm;
+  persistState();
+}
+
+// --- Watchdog Settings ---
+export interface WatchdogCheckpoint {
+  points: number;
+  breakBelow: number;
+}
+
+export interface WatchdogSettings {
+  watchdogEnabled: boolean;
+  watchdogCheckpoints: WatchdogCheckpoint[];
+}
+
+const DEFAULT_WATCHDOG_CHECKPOINTS: WatchdogCheckpoint[] = [
+  { points: 20, breakBelow: 10 },
+  { points: 30, breakBelow: 15 },
+  { points: 40, breakBelow: 20 },
+  { points: 50, breakBelow: 25 },
+  { points: 60, breakBelow: 30 },
+];
+
+let watchdogEnabled = false;
+let watchdogCheckpoints: WatchdogCheckpoint[] = JSON.parse(JSON.stringify(DEFAULT_WATCHDOG_CHECKPOINTS));
+
+export function getWatchdogSettings(): WatchdogSettings {
+  return {
+    watchdogEnabled,
+    watchdogCheckpoints: JSON.parse(JSON.stringify(watchdogCheckpoints)),
+  };
+}
+
+export function setWatchdogSettings(settings: Partial<WatchdogSettings>) {
+  if (typeof settings.watchdogEnabled === "boolean") {
+    watchdogEnabled = settings.watchdogEnabled;
+  }
+  if (Array.isArray(settings.watchdogCheckpoints)) {
+    watchdogCheckpoints = settings.watchdogCheckpoints.slice(0, 5).map((cp, idx) => ({
+      points: Number.isFinite(Number(cp.points)) ? Number(cp.points) : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.points ?? 0),
+      breakBelow: Number.isFinite(Number(cp.breakBelow)) ? Number(cp.breakBelow) : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.breakBelow ?? 0),
+    }));
+    while (watchdogCheckpoints.length < 5) {
+      const idx = watchdogCheckpoints.length;
+      watchdogCheckpoints.push({ ...DEFAULT_WATCHDOG_CHECKPOINTS[idx] });
+    }
+  }
   persistState();
 }
 
@@ -770,41 +819,67 @@ export function flushSoundEvents(): SoundType[] {
 
 
 
+function loadHistory() {
+  try {
+    if (fs.existsSync(HISTORY_DB_PATH)) {
+      const raw = fs.readFileSync(HISTORY_DB_PATH, "utf-8");
+      const data = JSON.parse(raw);
+      if (Array.isArray(data)) {
+        tradeHistory = data;
+      } else if (data && Array.isArray(data.tradeHistory)) {
+        tradeHistory = data.tradeHistory;
+      }
+    }
+  } catch (e) {
+    console.error("[trade-engine] Failed to load history:", e);
+    if (fs.existsSync(HISTORY_DB_PATH)) {
+      const backupPath = HISTORY_DB_PATH + ".corrupted";
+      try {
+        fs.renameSync(HISTORY_DB_PATH, backupPath);
+        console.log(`[trade-engine] Moved corrupted history file to ${backupPath}. Starting with fresh history.`);
+      } catch (renameErr) {
+        console.error("[trade-engine] Failed to backup corrupted history file:", renameErr);
+      }
+    }
+  }
+}
+
+function persistHistory() {
+  try {
+    const dir = path.dirname(HISTORY_DB_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(HISTORY_DB_PATH, JSON.stringify(tradeHistory, null, 2), "utf-8");
+  } catch (e) {
+    console.error("[trade-engine] Failed to persist history:", e);
+  }
+}
+
 function loadState() {
-
-
+  loadHistory();
 
   try {
-
-
-
     if (fs.existsSync(DB_PATH)) {
-
-
-
       const raw = fs.readFileSync(DB_PATH, "utf-8");
-
-
-
       const data = JSON.parse(raw);
 
-
-
       if (Array.isArray(data.waitingTrades)) waitingTrades = data.waitingTrades;
-
-
-
       if (Array.isArray(data.activeTrades)) activeTrades = data.activeTrades;
 
-
-
-      if (Array.isArray(data.tradeHistory)) tradeHistory = data.tradeHistory;
+      // Legacy migration: if trades.json still has tradeHistory, migrate to history.json
+      let needsRewriteWithoutHistory = false;
+      if (Array.isArray(data.tradeHistory) && data.tradeHistory.length > 0) {
+        if (tradeHistory.length === 0) {
+          tradeHistory = data.tradeHistory;
+          persistHistory();
+          console.log(`[trade-engine] Migrated ${tradeHistory.length} history items to ${HISTORY_DB_PATH}`);
+        }
+        needsRewriteWithoutHistory = true;
+      }
 
       if (Array.isArray(data.watchlist)) watchlist = data.watchlist;
-
       if (typeof data.lastStrategyCandleTime === "string") lastStrategyCandleTime = data.lastStrategyCandleTime;
-
-
 
       if (data.lastHandledSignalKey != null) lastHandledSignalKey = typeof data.lastHandledSignalKey === "string" ? {} : data.lastHandledSignalKey;
 
@@ -818,20 +893,26 @@ function loadState() {
       if (typeof data.autoCutoffMinutes === "string") autoCutoffMinutes = data.autoCutoffMinutes;
       if (typeof data.autoCutoffAmpm === "string") autoCutoffAmpm = data.autoCutoffAmpm;
 
+      if (typeof data.watchdogEnabled === "boolean") watchdogEnabled = data.watchdogEnabled;
+      if (Array.isArray(data.watchdogCheckpoints)) {
+        watchdogCheckpoints = data.watchdogCheckpoints.slice(0, 5).map((cp: any, idx: number) => ({
+          points: typeof cp.points === "number" ? cp.points : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.points ?? 0),
+          breakBelow: typeof cp.breakBelow === "number" ? cp.breakBelow : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.breakBelow ?? 0),
+        }));
+        while (watchdogCheckpoints.length < 5) {
+          const idx = watchdogCheckpoints.length;
+          watchdogCheckpoints.push({ ...DEFAULT_WATCHDOG_CHECKPOINTS[idx] });
+        }
+      }
 
+      console.log(`[trade-engine] Loaded state from ${DB_PATH} (${waitingTrades.length} waiting, ${activeTrades.length} active) and ${tradeHistory.length} history from ${HISTORY_DB_PATH}`);
 
-      console.log(`[trade-engine] Loaded state from ${DB_PATH} (${waitingTrades.length} waiting, ${activeTrades.length} active, ${tradeHistory.length} history)`);
-
-
-
+      if (needsRewriteWithoutHistory) {
+        persistState();
+        console.log(`[trade-engine] Rewrote ${DB_PATH} without tradeHistory.`);
+      }
     }
-
-
-
   } catch (e) {
-
-
-
     console.error("[trade-engine] Failed to load state:", e);
     
     // If file is corrupted, try to recover by renaming it and starting fresh
@@ -844,99 +925,48 @@ function loadState() {
         console.error("[trade-engine] Failed to backup corrupted file:", renameErr);
       }
     }
-
   }
-
-
-
 }
-
-
-
-
-
-
 
 let persistInFlight = false;
 
-
-
 function persistState() {
-
-
-
   if (persistInFlight) return;
-
-
-
   persistInFlight = true;
-
-
 
   try {
     const dir = path.dirname(DB_PATH);
-
-
-
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-
-
     const data = JSON.stringify({
-
-
-
       waitingTrades,
-
-
-
       activeTrades,
-
-
-
-      tradeHistory,
-
       watchlist,
-
       lastStrategyCandleTime,
-
-
-
       lastHandledSignalKey,
-
-
-
       totalTargetEnabled,
       totalTargetValue,
       totalLossEnabled,
       totalLossValue,
-
       autoCutoffEnabled,
       autoCutoffHours,
       autoCutoffMinutes,
       autoCutoffAmpm,
-
-
-
+      watchdogEnabled,
+      watchdogCheckpoints,
     }, null, 2);
 
 
 
-    fs.writeFile(DB_PATH, data, "utf-8", (err) => {
+    try {
+      fs.writeFileSync(DB_PATH, data, "utf-8");
+    } catch (e) {
+      console.error("[trade-engine] Failed to persist state:", e);
+    }
 
-
-
-      persistInFlight = false;
-
-
-
-      if (err) console.error("[trade-engine] Failed to persist state:", err);
-
-
-
-    });
+    persistInFlight = false;
 
 
 
@@ -1262,21 +1292,10 @@ function addHistoryEntry(symbol: string, pnl: number, logs: string[], config?: T
 
 
   tradeHistory = [
-
-
-
     { id: `${symbol}-${Date.now()}`, symbol, pnl, logs, createdAt: new Date().toISOString(), config },
-
-
-
     ...tradeHistory,
-
-
-
   ];
-
-
-
+  persistHistory();
 }
 
 
@@ -1416,7 +1435,8 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
     minTargetLockedPrice: undefined,
 
-
+    watchdogMaxGain: 0,
+    watchdogArmedCheckpoint: undefined,
 
     rangeEnabled: trade.rangeEnabled,
 
@@ -1683,6 +1703,7 @@ function completeActiveTrade(symbol: string, exitPrice: string, logLine: string)
 
 
         trailingTrailActive: false, trailingHighWatermark: undefined,
+        watchdogMaxGain: 0, watchdogArmedCheckpoint: undefined,
 
 
 
@@ -1868,6 +1889,8 @@ function forceExitTrade(symbol: string, exitPrice: string, totalPnl: number, log
 
       trailingHighWatermark: undefined,
       trailingSlHighWatermark: undefined,
+      watchdogMaxGain: 0,
+      watchdogArmedCheckpoint: undefined,
 
     };
 
@@ -1992,6 +2015,7 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
 
         trailingTrailActive: false, trailingHighWatermark: undefined,
+        watchdogMaxGain: 0, watchdogArmedCheckpoint: undefined,
 
 
 
@@ -2036,6 +2060,7 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
           exitPrice, logs: finalLogs, status: "COMPLETED" as const,
 
           trailingTrailActive: false, trailingHighWatermark: undefined,
+          watchdogMaxGain: 0, watchdogArmedCheckpoint: undefined,
 
         };
 
@@ -2066,6 +2091,7 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
           exitPrice, logs: finalLogs, status: "COMPLETED" as const,
 
           trailingTrailActive: false, trailingHighWatermark: undefined,
+          watchdogMaxGain: 0, watchdogArmedCheckpoint: undefined,
 
         };
 
@@ -2110,6 +2136,7 @@ function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: st
 
 
       trailingTrailActive: false, trailingHighWatermark: undefined,
+      watchdogMaxGain: 0, watchdogArmedCheckpoint: undefined,
 
 
 
@@ -2180,6 +2207,8 @@ function updateActiveTradeBuy(symbol: string, entryPrice: string, logLine: strin
 
       minTargetHighWatermark: undefined,
       minTargetLockedPrice: undefined,
+      watchdogMaxGain: 0,
+      watchdogArmedCheckpoint: undefined,
 
       reEntryExitPrice: undefined, reEntrySellTime: undefined, reEntryReason: undefined,
       pendingSkippedBuy: false, signalReEntryArmed: false,
@@ -2426,6 +2455,17 @@ function updateTrailingSlHighWatermark(symbol: string, price: number) {
     if (t.symbol !== symbol || t.status !== "ACTIVE" || !t.inPosition) return t;
     if (t.trailingSlHighWatermark && price <= t.trailingSlHighWatermark) return t;
     return { ...t, trailingSlHighWatermark: price };
+  });
+}
+
+function updateWatchdogState(symbol: string, maxGain: number, armedCheckpoint?: number) {
+  activeTrades = activeTrades.map((t) => {
+    if (t.symbol !== symbol || t.status !== "ACTIVE" || !t.inPosition) return t;
+    return {
+      ...t,
+      watchdogMaxGain: Math.max(t.watchdogMaxGain ?? 0, maxGain),
+      ...(armedCheckpoint !== undefined ? { watchdogArmedCheckpoint: armedCheckpoint } : {}),
+    };
   });
 }
 
@@ -3643,6 +3683,49 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
       }
     }
 
+    // ── Watchdog Checkpoints Logic ──
+    if (watchdogEnabled) {
+      const currentGain = ltp - entry;
+      const currentMaxGain = Math.max(trade.watchdogMaxGain ?? 0, currentGain);
+      if (currentMaxGain > (trade.watchdogMaxGain ?? 0)) {
+        updateWatchdogState(trade.symbol, currentMaxGain);
+      }
+
+      let reachedCp: WatchdogCheckpoint | null = null;
+      let reachedCpIndex = 0;
+
+      for (let i = 0; i < watchdogCheckpoints.length; i++) {
+        const cp = watchdogCheckpoints[i];
+        if (cp.points > 0 && currentMaxGain >= cp.points) {
+          if (!reachedCp || cp.points >= reachedCp.points) {
+            reachedCp = cp;
+            reachedCpIndex = i + 1;
+          }
+        }
+      }
+
+      if (reachedCp && reachedCpIndex > (trade.watchdogArmedCheckpoint ?? 0)) {
+        updateWatchdogState(trade.symbol, currentMaxGain, reachedCpIndex);
+        addLogToActive(
+          trade.symbol,
+          `WATCHDOG armed Checkpoint ${reachedCpIndex} (+${reachedCp.points} pts reached) — break floor set at +${reachedCp.breakBelow} pts (₹${(entry + reachedCp.breakBelow).toFixed(2)}) at ${currentTime}`
+        );
+        persistState();
+      }
+
+      if (reachedCp && currentGain <= reachedCp.breakBelow) {
+        const exitPrice = ltp;
+        triggeredPositions.add(positionKey);
+        trailingArmedPositions.delete(positionKey);
+        completeCycleWithoutExit(
+          trade.symbol,
+          String(exitPrice),
+          `WATCHDOG exit triggered for ₹${exitPrice.toFixed(2)} (reached +${reachedCp.points} pts, dropped below +${reachedCp.breakBelow} pts) at ${currentTime}`
+        );
+        continue;
+      }
+    }
+
     // Minimum Target logic
     const useReEntryMinTarget = trade.isReEntryCycle && trade.reEntryMinTargetEnabled;
     const effectiveMinEnabled = useReEntryMinTarget ? true : trade.minToHoldEnabled;
@@ -4567,6 +4650,7 @@ export function manualExit(symbol: string, exitPrice: string, lastCandleTime: st
 
 
       inPosition: false, pnl: totalPnl, logs: finalLogs,
+      watchdogMaxGain: 0, watchdogArmedCheckpoint: undefined,
 
 
 
@@ -4645,37 +4729,13 @@ export function removeCompletedTrade(symbol: string) {
 
 
 export function clearHistory() {
-
-
-
   tradeHistory = [];
-
-
-
-  persistState();
-
-
-
+  persistHistory();
 }
 
-
-
-
-
-
-
 export function removeHistoryEntry(id: string) {
-
-
-
   tradeHistory = tradeHistory.filter((t) => t.id !== id);
-
-
-
-  persistState();
-
-
-
+  persistHistory();
 }
 
 
@@ -4766,22 +4826,14 @@ export function stopEngine() {
 
 
 // Load persisted state and auto-start the engine when this module is first imported on the server
-
-
-
-loadState();
-
-loadAiSettingsFromDisk();
-
-
-
-ensureEngineRunning();
-
-
-
-// On startup, sync all waiting+active trade symbols to angel-feed server
-
-syncActiveStrategySymbols();
+// Skip during `next build` to prevent the build worker from crashing
+if (process.env.NEXT_PHASE !== 'phase-production-build') {
+  loadState();
+  loadAiSettingsFromDisk();
+  ensureEngineRunning();
+  // On startup, sync all waiting+active trade symbols to angel-feed server
+  syncActiveStrategySymbols();
+}
 
 
 
