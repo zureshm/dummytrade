@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import type { FocusEvent, InputHTMLAttributes } from "react";
-import { X, Settings, Play, Palette, Shield, ShieldAlert, HelpCircle, Loader2, FlaskConical, Volume2, Zap, GitBranch, Clock, Monitor } from "lucide-react";
+import { X, Settings, Play, Palette, Shield, Dog, HelpCircle, Loader2, FlaskConical, Volume2, Zap, GitBranch, Clock, Monitor } from "lucide-react";
 import { playSound, setVolume } from "@/lib/sounds";
 import { BASE_PATH } from "@/lib/basePath";
 import { useTheme } from "@/components/ThemeProvider";
@@ -107,10 +107,12 @@ export default function SettingsPopup({ open, onClose }: Props) {
   const [watchdogEnabled, setWatchdogEnabled] = useState(false);
   const [watchdogCheckpoints, setWatchdogCheckpoints] = useState([
     { points: 20, breakBelow: 10 },
-    { points: 30, breakBelow: 15 },
-    { points: 40, breakBelow: 20 },
-    { points: 50, breakBelow: 25 },
-    { points: 60, breakBelow: 30 },
+    { points: 35, breakBelow: 20 },
+    { points: 50, breakBelow: 35 },
+    { points: 80, breakBelow: 60 },
+    { points: 100, breakBelow: 80 },
+    { points: 130, breakBelow: 100 },
+    { points: 180, breakBelow: 150 },
   ]);
   const watchdogLoadedRef = useRef(false);
   const watchdogDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -749,7 +751,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
             <div className="mb-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <ShieldAlert size={18} style={{ color: "var(--theme-popup-border)" }} />
+                  <Dog size={18} style={{ color: "var(--theme-popup-border)" }} />
                   <h3 className="text-sm font-bold" style={{ color: "var(--theme-popup-text)" }}>Watchdog</h3>
                 </div>
                 <button
@@ -783,12 +785,14 @@ export default function SettingsPopup({ open, onClose }: Props) {
                 </button>
               </div>
 
+              {watchdogEnabled && (
+              <>
               <div className="flex items-baseline gap-2 mt-1 mb-3">
                 <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--theme-popup-text)" }}>Checkpoints</span>
                 <span className="text-[11px]" style={{ color: "var(--theme-popup-label)" }}>Based on current trade points achieved</span>
               </div>
 
-              <div className={`space-y-2 transition-opacity duration-200 ${watchdogEnabled ? "opacity-100" : "opacity-35 pointer-events-none"}`}>
+              <div className="space-y-2">
                 {watchdogCheckpoints.map((cp, idx) => (
                   <div
                     key={idx}
@@ -862,6 +866,8 @@ export default function SettingsPopup({ open, onClose }: Props) {
                   </div>
                 ))}
               </div>
+              </>
+              )}
             </div>
 
             {/* Separator */}

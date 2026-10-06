@@ -250,8 +250,6 @@ type TradeStoreValue = {
   logManualExit: (symbol: string, exitPrice: string, pnl: number, lastCandleTime: string) => void;
   // remove trade and free symbol
   removeTradeAndFreeSymbol: (symbol: string) => void;
-  // override config of a running (active) trade
-  updateActiveTradeConfig: (symbol: string, config: Partial<ActiveTrade>) => void;
   // append a log line to a waiting trade
   addLogToWaitingTrade: (symbol: string, log: string) => void;
   // append a log line to an active trade
@@ -964,12 +962,6 @@ export function TradeStoreProvider({
     }
   }, []);
 
-  const updateActiveTradeConfig = useCallback((symbol: string, config: Partial<ActiveTrade>) => {
-    setActiveTrades((prev) =>
-      prev.map((t) => t.symbol === symbol && t.status === "ACTIVE" ? { ...t, ...config } as ActiveTrade : t)
-    );
-  }, []);
-
   const value = useMemo(
     () => ({
       selection,
@@ -992,7 +984,6 @@ export function TradeStoreProvider({
       removeActiveTrade,
       logManualExit,
       removeTradeAndFreeSymbol,
-      updateActiveTradeConfig,
       addLogToActiveTrade,
       activateTrailingAfterTarget,
       updateTrailingHighWatermark,
@@ -1018,7 +1009,7 @@ export function TradeStoreProvider({
       logManualExit, removeTradeAndFreeSymbol, removeWaitingTrade,
       setLastStrategyCandleTime, addLogToWaitingTrade, updateActiveTradeBuy,
       removeActiveTrade, addLogToActiveTrade, activateTrailingAfterTarget,
-      updateTrailingHighWatermark, updateLastSellCandleTime, updateActiveTradeConfig,
+      updateTrailingHighWatermark, updateLastSellCandleTime,
       clearTradeHistory, removeTradeHistoryEntry
     ]
   );
