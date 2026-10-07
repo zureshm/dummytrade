@@ -670,6 +670,10 @@ function pushHistoryLog(msg: string) {
 // 'loading' = history fetch in progress, 'ready' = history loaded, 'failed' = 0 candles
 const symbolHistoryStatus: Record<string, { status: string; candleCount: number }> = {};
 
+// "Use Nifty" bindings — symbols whose strategy signals come from the
+// FAKE_CE / FAKE_PE Nifty50 index streams instead of their own candles.
+const niftySignalBinding: Record<string, "FAKE_CE" | "FAKE_PE"> = {};
+
 // Check history status from angel-feed server for a symbol.
 // Phase 1: poll every 5s for up to 60s. If not ready, mark "failed".
 // Phase 2: keep re-checking every 30s for up to 10 min — angel-feed may
@@ -907,6 +911,12 @@ function loadState() {
         }
       }
 
+      if (data.niftySignalBinding && typeof data.niftySignalBinding === "object") {
+        for (const [k, v] of Object.entries(data.niftySignalBinding)) {
+          if (v === "FAKE_CE" || v === "FAKE_PE") niftySignalBinding[k] = v;
+        }
+      }
+
       console.log(`[trade-engine] Loaded state from ${DB_PATH} (${waitingTrades.length} waiting, ${activeTrades.length} active) and ${tradeHistory.length} history from ${HISTORY_DB_PATH}`);
 
       if (needsRewriteWithoutHistory) {
@@ -958,6 +968,7 @@ function persistState() {
       autoCutoffAmpm,
       watchdogEnabled,
       watchdogCheckpoints,
+      niftySignalBinding,
     }, null, 2);
 
 
@@ -2610,7 +2621,8 @@ function handleStrategySignal(signal: any) {
     fetch(`${STRATEGY_URL}/chart-history`)
       .then((r) => r.json())
       .then((historyData) => {
-        const candles = Array.isArray(historyData?.[signalSymbol]) ? historyData[signalSymbol] : [];
+        const histKey = niftySignalBinding[signalSymbol] ?? signalSymbol;
+        const candles = Array.isArray(historyData?.[histKey]) ? historyData[histKey] : [];
         if (candles.length === 0) {
           addAiLog(`[ai-guard] No chart-history for ${signalSymbol}, skipping`);
           return null;
@@ -3911,14 +3923,35 @@ async function tick() {
 
     const symbolsToQuery = new Set<string>();
 
-    for (const t of waitingTrades) symbolsToQuery.add(t.symbol);
+    // Bound symbols query their FAKE_CE / FAKE_PE stream instead of their own name
+    const signalSourceFor = (sym: string) => niftySignalBinding[sym] ?? sym;
+
+    for (const t of waitingTrades) symbolsToQuery.add(signalSourceFor(t.symbol));
 
     for (const t of activeTrades) {
 
-      if (t.status === "ACTIVE" && !t.inPosition) symbolsToQuery.add(t.symbol);
+      if (t.status === "ACTIVE" && !t.inPosition) symbolsToQuery.add(signalSourceFor(t.symbol));
 
-      if (t.status === "ACTIVE" && t.inPosition) symbolsToQuery.add(t.symbol);
+      if (t.status === "ACTIVE" && t.inPosition) symbolsToQuery.add(signalSourceFor(t.symbol));
 
+    }
+
+    // Real LTP for bound symbols — stamped into relayed fake signals as `close`
+    const boundSymbols = new Set<string>();
+    for (const t of waitingTrades) if (niftySignalBinding[t.symbol]) boundSymbols.add(t.symbol);
+    for (const t of activeTrades) if (t.status === "ACTIVE" && niftySignalBinding[t.symbol]) boundSymbols.add(t.symbol);
+
+    const boundLtp: Record<string, number> = {};
+    if (boundSymbols.size > 0) {
+      try {
+        const ltpRes = await fetch(`${API_URL}/prices?symbols=${[...boundSymbols].join(",")}`);
+        const prices = await ltpRes.json();
+        if (Array.isArray(prices)) {
+          for (const p of prices) {
+            if (p?.symbol && Number.isFinite(Number(p.ltp))) boundLtp[p.symbol] = Number(p.ltp);
+          }
+        }
+      } catch { /* market data not running */ }
     }
 
 
@@ -3941,7 +3974,19 @@ async function tick() {
 
         if (signal && signal.signal) {
 
-          handleStrategySignal(signal);
+          if (signal.symbol === "FAKE_CE" || signal.symbol === "FAKE_PE") {
+            // Relay the fake-stream signal to every bound symbol, with close stamped
+            // to the option's real LTP so entries/exits book at the real premium.
+            const src = signal.symbol;
+            for (const real of Object.keys(niftySignalBinding)) {
+              if (niftySignalBinding[real] !== src) continue;
+              const stamped = { ...signal, symbol: real };
+              if (Number.isFinite(boundLtp[real])) stamped.close = boundLtp[real];
+              handleStrategySignal(stamped);
+            }
+          } else {
+            handleStrategySignal(signal);
+          }
 
         }
 
@@ -4192,6 +4237,8 @@ export function getEngineState() {
 
     symbolHistoryStatus,
 
+    niftySignalBinding: { ...niftySignalBinding },
+
     historyFetchLogs: [...historyFetchLogs],
 
     aiSuggestions: [...aiSuggestions],
@@ -4227,6 +4274,29 @@ export function getEngineState() {
 // Force a symbol into the initialized set — user accepts running without full history
 export function forceInitSymbol(symbol: string) {
   symbolsWithFirstSignal.add(symbol);
+}
+
+// "Use Nifty" — bind a symbol's strategy signals to the FAKE_CE / FAKE_PE
+// index streams instead of its own candles. PE symbols get FAKE_PE (mirrored).
+export function bindNiftySignal(symbol: string) {
+  const src = symbol.endsWith("PE") ? "FAKE_PE" : "FAKE_CE";
+  niftySignalBinding[symbol] = src;
+  symbolHistoryStatus[symbol] = { status: "ready", candleCount: 0 };
+  symbolsWithFirstSignal.add(symbol);
+  pushHistoryLog(`${symbol} bound to ${src} — using Nifty50 index candles for strategy signals`);
+  addLogToWaiting(symbol, `Use Nifty — strategy signals now sourced from ${src} (Nifty50 index)`);
+  persistState();
+}
+
+// Revert a bound symbol to its own strategy stream. If the real history was
+// never loaded the strategy has no candles for it — chart goes blank and
+// signals stay WAIT; harmless (price-based SL/target still run on real LTP).
+export function unbindNiftySignal(symbol: string) {
+  if (!niftySignalBinding[symbol]) return;
+  delete niftySignalBinding[symbol];
+  pushHistoryLog(`${symbol} unbound — strategy signals reverted to its own candles`);
+  addLogToWaiting(symbol, `Signal source switched back to ${symbol}'s own candles`);
+  persistState();
 }
 
 // Retry history fetch for a symbol that was force-initialized without history
@@ -4280,6 +4350,7 @@ export function addWaitingTrade(trade: WaitingTrade) {
 
   // Reset history status and kick off one-time check (non-blocking)
   delete symbolHistoryStatus[trade.symbol];
+  delete niftySignalBinding[trade.symbol];
   checkSymbolHistoryStatus(trade.symbol);
 
   // Clean up stale state before adding new trade
@@ -4496,6 +4567,7 @@ export function cancelWaitingTrade(symbol: string) {
   delete tradeAddedCandleTime[symbol];
   delete lastHandledSignalKey[symbol];
   delete lastBuyCandleTime[symbol];
+  delete niftySignalBinding[symbol];
 
   setAiSymbolEnabled(symbol, false);
 
@@ -4671,6 +4743,7 @@ export function removeCompletedTrade(symbol: string) {
   delete tradeAddedCandleTime[symbol];
   delete lastHandledSignalKey[symbol];
   delete lastBuyCandleTime[symbol];
+  delete niftySignalBinding[symbol];
 
   setAiSymbolEnabled(symbol, false);
 

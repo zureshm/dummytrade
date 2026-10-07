@@ -65,13 +65,32 @@ type Props = {
   onClose: () => void;
 };
 
+// Candle palettes — bound (index-signal) symbols render cyan/pink so the
+// FAKE stream is visually distinct from real option candles.
+const REAL_CANDLE_COLORS = {
+  upColor: "#0ad125",
+  downColor: "#ea3434",
+  borderUpColor: "#0ad125",
+  borderDownColor: "#ea3434",
+  wickUpColor: "#0ad125",
+  wickDownColor: "#ea3434",
+};
+const FAKE_CANDLE_COLORS = {
+  upColor: "#22d3ee",
+  downColor: "#ec4899",
+  borderUpColor: "#22d3ee",
+  borderDownColor: "#ec4899",
+  wickUpColor: "#22d3ee",
+  wickDownColor: "#ec4899",
+};
+
 type Nifty50CandleData = {
   completedCandles: CandleData[];
   currentCandle: CandleData | null;
 };
 
 export default function ChartPopup({ open, onClose }: Props) {
-  const { activeTrades, waitingTrades } = useTradeStore();
+  const { activeTrades, waitingTrades, niftySignalBindings } = useTradeStore();
   const [symbolCandles, setSymbolCandles] = useState<SymbolCandles>({});
   const [, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -615,6 +634,10 @@ export default function ChartPopup({ open, onClose }: Props) {
           for (const sym of Object.keys(result)) {
             filteredResult[sym] = (result[sym] || []).filter(c => isWithinMarketHours(c.time));
           }
+          // Bound symbols chart the candles the strategy actually evaluates
+          for (const [sym, src] of Object.entries(niftySignalBindings)) {
+            if (filteredResult[src]?.length) filteredResult[sym] = filteredResult[src];
+          }
           setSymbolCandles(filteredResult);
           setError(null);
         })
@@ -634,7 +657,7 @@ export default function ChartPopup({ open, onClose }: Props) {
       clearTimeout(kickoff);
       clearInterval(interval);
     };
-  }, [open, refreshKey]);
+  }, [open, refreshKey, niftySignalBindings]);
 
   // Create/update charts when data changes
   useEffect(() => {
@@ -682,14 +705,8 @@ export default function ChartPopup({ open, onClose }: Props) {
           },
         });
 
-        const main = chart.addSeries(CandlestickSeries, {
-          upColor: "#0ad125",
-          downColor: "#ea3434",
-          borderUpColor: "#0ad125",
-          borderDownColor: "#ea3434",
-          wickUpColor: "#0ad125",
-          wickDownColor: "#ea3434",
-        });
+        const main = chart.addSeries(CandlestickSeries,
+          niftySignalBindings[symbol] ? FAKE_CANDLE_COLORS : REAL_CANDLE_COLORS);
 
         const ema1 = chart.addSeries(LineSeries, { color: "#5488fa", lineWidth: 1 });
         const ema2 = chart.addSeries(LineSeries, { color: "#ffd932", lineWidth: 1 });
@@ -702,6 +719,7 @@ export default function ChartPopup({ open, onClose }: Props) {
       }
 
       const { main, ema1, ema2, markerPlugin, labelPlugin } = seriesInstances.current[symbol];
+      main.applyOptions(niftySignalBindings[symbol] ? FAKE_CANDLE_COLORS : REAL_CANDLE_COLORS);
 
       // Filter invalid times, deduplicate, and sort ascending
       const mapped = candles
@@ -777,7 +795,7 @@ export default function ChartPopup({ open, onClose }: Props) {
         );
       }
     });
-  }, [symbolCandles, activeSymbols, heikenAshi,
+  }, [symbolCandles, activeSymbols, heikenAshi, niftySignalBindings,
       sEma1Enabled, sEma1Period, sEma2Enabled, sEma2Period,
       sUtbot1Enabled, sUtbot1Key, sUtbot1Atr,
       sUtbot2Enabled, sUtbot2Key, sUtbot2Atr,
@@ -1153,7 +1171,7 @@ export default function ChartPopup({ open, onClose }: Props) {
                         </span>
                         {hasData && (
                           <span className="ml-2 font-normal" style={{ color: "var(--theme-popup-label)" }}>
-                            ({symbolCandles[symbol]?.length || 0} candles)
+                            ({symbolCandles[symbol]?.length || 0} candles{niftySignalBindings[symbol] ? ` · ${niftySignalBindings[symbol]}` : ""})
                           </span>
                         )}
                       </div>

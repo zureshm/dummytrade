@@ -281,6 +281,7 @@ type TradeStoreValue = {
     aiGuardActive?: boolean;
     aiRegime?: Record<string, { regime: string; confidence: number }>;
     aiSymbolEnabled?: Record<string, boolean>;
+    niftySignalBinding?: Record<string, string>;
   }) => void;
 
   // AI Guard
@@ -288,6 +289,9 @@ type TradeStoreValue = {
   aiGuardActive: boolean;
   aiRegime: Record<string, { regime: string; confidence: number }>;
   aiSymbolEnabled: Record<string, boolean>;
+
+  // "Use Nifty" bindings — symbol → FAKE_CE | FAKE_PE
+  niftySignalBindings: Record<string, string>;
 
   // symbols that have received at least one valid signal (loader tracking)
   initializedSymbols: Set<string>;
@@ -362,6 +366,7 @@ export function TradeStoreProvider({
   const [aiGuardActive, setAiGuardActive] = useState(false);
   const [aiRegime, setAiRegime] = useState<Record<string, { regime: string; confidence: number }>>({});
   const [aiSymbolEnabled, setAiSymbolEnabled] = useState<Record<string, boolean>>({});
+  const [niftySignalBindings, setNiftySignalBindings] = useState<Record<string, string>>({});
 
   // Track whether we've done the initial sync from server
   const initialSyncDone = useRef(false);
@@ -900,6 +905,7 @@ export function TradeStoreProvider({
     aiGuardActive?: boolean;
     aiRegime?: Record<string, { regime: string; confidence: number }>;
     aiSymbolEnabled?: Record<string, boolean>;
+    niftySignalBinding?: Record<string, string>;
   }) => {
     // On first sync (page load/refresh), populate waitingTrades from server.
     // After that, waitingTrades is frontend-owned — only remove trades that
@@ -960,6 +966,9 @@ export function TradeStoreProvider({
     if (state.aiSymbolEnabled) {
       setAiSymbolEnabled(state.aiSymbolEnabled);
     }
+    if (state.niftySignalBinding) {
+      setNiftySignalBindings(state.niftySignalBinding);
+    }
   }, []);
 
   const value = useMemo(
@@ -999,11 +1008,12 @@ export function TradeStoreProvider({
       aiGuardActive,
       aiRegime,
       aiSymbolEnabled,
+      niftySignalBindings,
     }),
     [
       selection, forceBuyEnabled, desktopViewEnabled, waitingTrades, activeTrades, tradeHistory,
       syncFromServer, initializedSymbols, symbolHistoryStatus, aiSuggestions,
-      aiGuardActive, aiSymbolEnabled, aiRegime,
+      aiGuardActive, aiSymbolEnabled, aiRegime, niftySignalBindings,
       activateWaitingTrade, addTradeHistoryEntry, addWaitingTradeFromSelection,
       completeActiveTrade, completeCycleWithoutExit, getLastStrategyCandleTime,
       logManualExit, removeTradeAndFreeSymbol, removeWaitingTrade,
