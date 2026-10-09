@@ -125,6 +125,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
 
   const aiGuardEnabled = aiSettings.enabled;
   const aiEntryGuardEnabled = aiSettings.entryGuardEnabled;
+  const aiReEntryGuardEnabled = aiSettings.reEntryGuardEnabled;
   const aiAutoExitEnabled = aiSettings.autoExitEnabled;
   const aiCandlesCount = aiSettings.candlesCount;
   const aiRecentCandlesCount = aiSettings.recentCandlesCount;
@@ -218,6 +219,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
           updateAiSettings({
             enabled: Boolean(data.enabled),
             entryGuardEnabled: Boolean(data.entryGuardEnabled),
+            reEntryGuardEnabled: Boolean(data.reEntryGuardEnabled),
             autoExitEnabled: Boolean(data.autoExitEnabled),
             candlesCount: typeof data.candlesCount === "number" ? data.candlesCount : 120,
             recentCandlesCount: typeof data.recentCandlesCount === "number" ? data.recentCandlesCount : 30,
@@ -232,6 +234,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
           // Sync to localStorage as cache
           localStorage.setItem("dummy_aiGuardEnabled", String(data.enabled));
           localStorage.setItem("dummy_aiEntryGuardEnabled", String(data.entryGuardEnabled));
+          localStorage.setItem("dummy_aiReEntryGuardEnabled", String(data.reEntryGuardEnabled));
           localStorage.setItem("dummy_aiAutoExitEnabled", String(data.autoExitEnabled));
           localStorage.setItem("dummy_aiCandlesCount", String(data.candlesCount));
           localStorage.setItem("dummy_aiRecentCandlesCount", String(data.recentCandlesCount));
@@ -248,6 +251,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
         // Server unreachable — fall back to localStorage
         const aiGuard = localStorage.getItem("dummy_aiGuardEnabled");
         const aiEntry = localStorage.getItem("dummy_aiEntryGuardEnabled");
+        const aiReEntry = localStorage.getItem("dummy_aiReEntryGuardEnabled");
         const aiAutoExit = localStorage.getItem("dummy_aiAutoExitEnabled");
         const aiCandles = localStorage.getItem("dummy_aiCandlesCount");
         const aiRecentCandles = localStorage.getItem("dummy_aiRecentCandlesCount");
@@ -262,6 +266,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
         updateAiSettings({
           enabled: aiGuard === "true" ? true : false,
           entryGuardEnabled: aiEntry === "true" ? true : false,
+          reEntryGuardEnabled: aiReEntry === "true" ? true : false,
           autoExitEnabled: aiAutoExit === "true" ? true : false,
           candlesCount: aiCandles ? parseInt(aiCandles, 10) : 120,
           recentCandlesCount: aiRecentCandles ? parseInt(aiRecentCandles, 10) : 30,
@@ -292,6 +297,7 @@ export default function SettingsPopup({ open, onClose }: Props) {
         body: JSON.stringify({
           enabled: aiSettings.enabled,
           entryGuardEnabled: aiSettings.entryGuardEnabled,
+          reEntryGuardEnabled: aiSettings.reEntryGuardEnabled,
           autoExitEnabled: aiSettings.autoExitEnabled,
           candlesCount: aiSettings.candlesCount,
           recentCandlesCount: aiSettings.recentCandlesCount,
@@ -1061,6 +1067,44 @@ export default function SettingsPopup({ open, onClose }: Props) {
                             position: "absolute",
                             top: 2,
                             left: aiEntryGuardEnabled ? 19 : 2,
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: "#fff",
+                            transition: "left 0.2s",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                          }}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Re-Entry Guard toggle */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="relative flex items-center gap-1.5">
+                        <label className="text-xs font-semibold" style={{ color: "var(--theme-popup-text)" }}>Enable Re-Entry Guard</label>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateAiSettings({ reEntryGuardEnabled: !aiReEntryGuardEnabled })}
+                        style={{
+                          width: 36,
+                          height: 20,
+                          borderRadius: 10,
+                          background: aiReEntryGuardEnabled ? "var(--theme-toggle-on, var(--theme-popup-border))" : "var(--theme-toggle-off, var(--theme-popup-field-border))",
+                          boxShadow: aiReEntryGuardEnabled ? "0 0 8px rgba(251, 191, 36, 0.4)" : "none",
+                          position: "relative",
+                          transition: "background 0.2s, box-shadow 0.2s",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 2,
+                            left: aiReEntryGuardEnabled ? 19 : 2,
                             width: 16,
                             height: 16,
                             borderRadius: "50%",

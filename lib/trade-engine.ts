@@ -2693,7 +2693,13 @@ function handleStrategySignal(signal: any) {
       }
 
       // EntryGuard — block BUY if sideways/reversing
-      if (settings.entryGuardEnabled && result.blockEntry) {
+      // Drop stale buffered signals whose guard has been toggled off
+      const staleBuffered = pendingBuyBuffer[signalSymbol];
+      if (staleBuffered && (staleBuffered.signalType === "BUY" ? !settings.entryGuardEnabled : !settings.reEntryGuardEnabled)) {
+        delete pendingBuyBuffer[signalSymbol];
+        addAiLog(`[ai-guard] Dropped stale buffered ${staleBuffered.signalType} for ${signalSymbol} — its guard is disabled`);
+      }
+      if ((settings.entryGuardEnabled || settings.reEntryGuardEnabled) && result.blockEntry) {
         // If there's a buffered BUY, increment its candle count
         const buffered = pendingBuyBuffer[signalSymbol];
         if (buffered) {
@@ -2714,7 +2720,7 @@ function handleStrategySignal(signal: any) {
         }
 
         addAiLog(`[ai-guard] Entry blocked for ${signalSymbol}: ${result.reason} (${result.confidence}%)`);
-      } else if (settings.entryGuardEnabled && !result.blockEntry) {
+      } else if ((settings.entryGuardEnabled || settings.reEntryGuardEnabled) && !result.blockEntry) {
         // AI says upwards — if there's a buffered BUY, fire it now
         const buffered = pendingBuyBuffer[signalSymbol];
         if (buffered) {
@@ -3396,10 +3402,10 @@ function handleStrategySignal(signal: any) {
       return;
     }
 
-    // AI Guard EntryGuard for REENTER — same buffering logic as BUY
+    // AI Re-Entry Guard for REENTER — same buffering logic as BUY
     const reAiResult = lastAiResult[signalSymbol];
     const reAiSettings = getAiGuardSettings();
-    if (reAiSettings.entryGuardEnabled && reAiResult && reAiResult.blockEntry) {
+    if (reAiSettings.reEntryGuardEnabled && reAiResult && reAiResult.blockEntry) {
       if (reAiSettings.entryBufferMaxCandles > 0) {
         pendingBuyBuffer[signalSymbol] = {
           signalType: "REENTER",
@@ -3407,12 +3413,12 @@ function handleStrategySignal(signal: any) {
           candlesElapsed: 0,
           originalSignal: signal,
         };
-        const blockedLog = `REENTER buffered by AI Guard — ${reAiResult.reason} (${reAiResult.confidence}%) at ${fmtTime(signal.lastCandleTime)} (waiting for upwards, up to ${reAiSettings.entryBufferMaxCandles} candles)`;
+        const blockedLog = `REENTER buffered by AI Re-Entry Guard — ${reAiResult.reason} (${reAiResult.confidence}%) at ${fmtTime(signal.lastCandleTime)} (waiting for upwards, up to ${reAiSettings.entryBufferMaxCandles} candles)`;
         if (waitingTrades.find((t) => t.symbol === signalSymbol)) { addLogToWaiting(signalSymbol, blockedLog); }
         else { addLogToActive(signalSymbol, blockedLog); }
         addAiLog(`[ai-guard] REENTER buffered for ${signalSymbol}: ${reAiResult.reason} (${reAiResult.confidence}%)`);
       } else {
-        const blockedLog = `REENTER blocked by AI Guard — ${reAiResult.reason} (${reAiResult.confidence}%) at ${fmtTime(signal.lastCandleTime)}`;
+        const blockedLog = `REENTER blocked by AI Re-Entry Guard — ${reAiResult.reason} (${reAiResult.confidence}%) at ${fmtTime(signal.lastCandleTime)}`;
         if (waitingTrades.find((t) => t.symbol === signalSymbol)) { addLogToWaiting(signalSymbol, blockedLog); }
         else { addLogToActive(signalSymbol, blockedLog); }
         addAiLog(`[ai-guard] REENTER blocked for ${signalSymbol}: ${reAiResult.reason} (${reAiResult.confidence}%)`);
@@ -3604,14 +3610,14 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
                 }
                 continue;
               }
-              // AI Guard check — block re-entry if AI says sideways/reversing
+              // AI Re-Entry Guard check — block re-entry if AI says sideways/reversing
               const aiSettings = getAiGuardSettings();
-              if (aiSettings.entryGuardEnabled && isAiGuardActive() && aiSymbolEnabled[trade.symbol] === true) {
+              if (aiSettings.reEntryGuardEnabled && isAiGuardActive() && aiSymbolEnabled[trade.symbol] === true) {
                 const aiResult = lastAiResult[trade.symbol];
                 if (aiResult && aiResult.blockEntry) {
                   if (lastReEntryBlockedCandle[trade.symbol] !== lastStrategyCandleTime) {
                     lastReEntryBlockedCandle[trade.symbol] = lastStrategyCandleTime;
-                    addLogToActive(trade.symbol, `RE-ENTRY blocked by AI Guard — ${aiResult.marketRegime} (${aiResult.confidence}%) at ${currentTime}`);
+                    addLogToActive(trade.symbol, `RE-ENTRY blocked by AI Re-Entry Guard — ${aiResult.marketRegime} (${aiResult.confidence}%) at ${currentTime}`);
                     addAiLog(`[ai-guard] Auto re-entry blocked for ${trade.symbol}: ${aiResult.reason} (${aiResult.confidence}%)`);
                   }
                   continue;
