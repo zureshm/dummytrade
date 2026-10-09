@@ -498,8 +498,8 @@ const triggerTimerFired: Set<string> = new Set();
 const aiSuggestions: AiSuggestion[] = [];
 const lastAiCandleTime: Record<string, string> = {};
 const lastAiResult: Record<string, AiAnalysisResult> = {};
-// Tracks the candle time when SIDEWAYS was first detected — exit only after 2nd consecutive sideways candle
-const pendingSidewaysExits: Record<string, string> = {};
+// Consecutive SIDEWAYS/CHOPPY candle count per symbol — auto-exit fires when it reaches exitBufferCandles
+const pendingSidewaysExits: Record<string, number> = {};
 export function clearAiResults() {
   for (const k of Object.keys(lastAiResult)) delete lastAiResult[k];
   for (const k of Object.keys(pendingSidewaysExits)) delete pendingSidewaysExits[k];
@@ -577,13 +577,16 @@ export interface WatchdogSettings {
 }
 
 const DEFAULT_WATCHDOG_CHECKPOINTS: WatchdogCheckpoint[] = [
-  { points: 20, breakBelow: 10 },
-  { points: 35, breakBelow: 20 },
-  { points: 50, breakBelow: 35 },
-  { points: 80, breakBelow: 60 },
+  { points: 16, breakBelow: 10 },
+  { points: 25, breakBelow: 15 },
+  { points: 40, breakBelow: 25 },
+  { points: 60, breakBelow: 40 },
   { points: 100, breakBelow: 80 },
-  { points: 130, breakBelow: 100 },
-  { points: 180, breakBelow: 150 },
+  { points: 130, breakBelow: 105 },
+  { points: 150, breakBelow: 125 },
+  { points: 170, breakBelow: 145 },
+  { points: 190, breakBelow: 160 },
+  { points: 210, breakBelow: 180 },
 ];
 
 let watchdogEnabled = false;
@@ -601,11 +604,11 @@ export function setWatchdogSettings(settings: Partial<WatchdogSettings>) {
     watchdogEnabled = settings.watchdogEnabled;
   }
   if (Array.isArray(settings.watchdogCheckpoints)) {
-    watchdogCheckpoints = settings.watchdogCheckpoints.slice(0, 7).map((cp, idx) => ({
+    watchdogCheckpoints = settings.watchdogCheckpoints.slice(0, DEFAULT_WATCHDOG_CHECKPOINTS.length).map((cp, idx) => ({
       points: Number.isFinite(Number(cp.points)) ? Number(cp.points) : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.points ?? 0),
       breakBelow: Number.isFinite(Number(cp.breakBelow)) ? Number(cp.breakBelow) : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.breakBelow ?? 0),
     }));
-    while (watchdogCheckpoints.length < 7) {
+    while (watchdogCheckpoints.length < DEFAULT_WATCHDOG_CHECKPOINTS.length) {
       const idx = watchdogCheckpoints.length;
       watchdogCheckpoints.push({ ...DEFAULT_WATCHDOG_CHECKPOINTS[idx] });
     }
@@ -901,11 +904,11 @@ function loadState() {
 
       if (typeof data.watchdogEnabled === "boolean") watchdogEnabled = data.watchdogEnabled;
       if (Array.isArray(data.watchdogCheckpoints)) {
-        watchdogCheckpoints = data.watchdogCheckpoints.slice(0, 7).map((cp: any, idx: number) => ({
+        watchdogCheckpoints = data.watchdogCheckpoints.slice(0, DEFAULT_WATCHDOG_CHECKPOINTS.length).map((cp: any, idx: number) => ({
           points: typeof cp.points === "number" ? cp.points : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.points ?? 0),
           breakBelow: typeof cp.breakBelow === "number" ? cp.breakBelow : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.breakBelow ?? 0),
         }));
-        while (watchdogCheckpoints.length < 7) {
+        while (watchdogCheckpoints.length < DEFAULT_WATCHDOG_CHECKPOINTS.length) {
           const idx = watchdogCheckpoints.length;
           watchdogCheckpoints.push({ ...DEFAULT_WATCHDOG_CHECKPOINTS[idx] });
         }
@@ -2734,25 +2737,30 @@ function handleStrategySignal(signal: any) {
       // Exit Guard — suggest or auto-execute exit
       // Re-fetch current trade — it may have completed during the async AI call
       const currentTrade = activeTrades.find((t) => t.symbol === signalSymbol && t.status === "ACTIVE");
+      if (result.suggestExit && currentTrade && !currentTrade.inPosition && pendingSidewaysExits[signalSymbol]) {
+        delete pendingSidewaysExits[signalSymbol];
+      }
       if (result.suggestExit && currentTrade && currentTrade.inPosition) {
         if (settings.autoExitEnabled) {
-          // SIDEWAYS/CHOPPY require 2-candle confirmation before exiting; DOWNWARDS/REVERSING exit immediately
+          // SIDEWAYS/CHOPPY require N consecutive-candle confirmation before exiting; DOWNWARDS/REVERSING exit immediately
           if (result.marketRegime === "SIDEWAYS" || result.marketRegime === "CHOPPY") {
-            if (!pendingSidewaysExits[signalSymbol]) {
-              // First sideways candle — wait for confirmation
-              pendingSidewaysExits[signalSymbol] = candleTime;
-              addLogToActive(signalSymbol, `AI detected SIDEWAYS — waiting for 2nd candle confirmation at ${now}`);
-              addAiLog(`[ai-guard] Sideways detected for ${signalSymbol}, waiting for 2nd candle confirmation`);
-            } else {
-              // 2nd consecutive sideways candle — exit now
+            const exitBuffer = Math.max(1, settings.exitBufferCandles ?? 3);
+            const seen = (pendingSidewaysExits[signalSymbol] || 0) + 1;
+            if (seen >= exitBuffer) {
+              // Nth consecutive sideways candle — exit now
               completeCycleWithoutExit(
                 currentTrade.symbol,
                 String(latestClose ?? ""),
-                `AI Guard auto-exit: Sideways confirmed over 2 candles (${result.reason}, ${result.confidence}%) at ${now}`
+                `AI Guard auto-exit: Sideways confirmed over ${seen} candles (${result.reason}, ${result.confidence}%) at ${now}`
               );
               updateLastSellCandleTime(currentTrade.symbol, signal.lastCandleTime ?? "");
-              addAiLog(`[ai-guard] Auto-exit executed for ${signalSymbol}: sideways confirmed (${result.reason}, ${result.confidence}%)`);
+              addAiLog(`[ai-guard] Auto-exit executed for ${signalSymbol}: sideways confirmed over ${seen} candles (${result.reason}, ${result.confidence}%)`);
               delete pendingSidewaysExits[signalSymbol];
+            } else {
+              // Sideways candle X/N — keep waiting for confirmation
+              pendingSidewaysExits[signalSymbol] = seen;
+              addLogToActive(signalSymbol, `AI detected SIDEWAYS — waiting for confirmation (candle ${seen}/${exitBuffer}) at ${now}`);
+              addAiLog(`[ai-guard] Sideways detected for ${signalSymbol}, candle ${seen}/${exitBuffer} — waiting for confirmation`);
             }
           } else {
             // DOWNWARDS / REVERSING — exit immediately

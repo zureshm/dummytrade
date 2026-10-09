@@ -98,13 +98,16 @@ export default function SettingsDesktop() {
 
   const [watchdogEnabled, setWatchdogEnabled] = useState(false);
   const [watchdogCheckpoints, setWatchdogCheckpoints] = useState([
-    { points: 20, breakBelow: 10 },
-    { points: 35, breakBelow: 20 },
-    { points: 50, breakBelow: 35 },
-    { points: 80, breakBelow: 60 },
+    { points: 16, breakBelow: 10 },
+    { points: 25, breakBelow: 15 },
+    { points: 40, breakBelow: 25 },
+    { points: 60, breakBelow: 40 },
     { points: 100, breakBelow: 80 },
-    { points: 130, breakBelow: 100 },
-    { points: 180, breakBelow: 150 },
+    { points: 130, breakBelow: 105 },
+    { points: 150, breakBelow: 125 },
+    { points: 170, breakBelow: 145 },
+    { points: 190, breakBelow: 160 },
+    { points: 210, breakBelow: 180 },
   ]);
   const watchdogLoadedRef = useRef(false);
   const watchdogDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,6 +120,7 @@ export default function SettingsDesktop() {
   const aiCandlesCount = aiSettings.candlesCount;
   const aiRecentCandlesCount = aiSettings.recentCandlesCount;
   const aiEntryBufferMaxCandles = aiSettings.entryBufferMaxCandles;
+  const aiExitBufferCandles = aiSettings.exitBufferCandles;
   const aiConsiderVolume = aiSettings.considerVolume;
   const aiUseHeikinAshi = aiSettings.useHeikinAshi;
   const aiProvider = aiSettings.provider;
@@ -204,6 +208,7 @@ export default function SettingsDesktop() {
             candlesCount: typeof data.candlesCount === "number" ? data.candlesCount : 120,
             recentCandlesCount: typeof data.recentCandlesCount === "number" ? data.recentCandlesCount : 30,
             entryBufferMaxCandles: typeof data.entryBufferMaxCandles === "number" ? data.entryBufferMaxCandles : 1,
+            exitBufferCandles: typeof data.exitBufferCandles === "number" ? data.exitBufferCandles : 3,
             considerVolume: typeof data.considerVolume === "boolean" ? data.considerVolume : false,
             useHeikinAshi: typeof data.useHeikinAshi === "boolean" ? data.useHeikinAshi : true,
             provider: typeof data.provider === "string" ? data.provider : "local",
@@ -217,6 +222,7 @@ export default function SettingsDesktop() {
           localStorage.setItem("dummy_aiCandlesCount", String(data.candlesCount));
           localStorage.setItem("dummy_aiRecentCandlesCount", String(data.recentCandlesCount));
           localStorage.setItem("dummy_aiEntryBufferMaxCandles", String(data.entryBufferMaxCandles || 1));
+          localStorage.setItem("dummy_aiExitBufferCandles", String(data.exitBufferCandles || 3));
           localStorage.setItem("dummy_aiConsiderVolume", String(data.considerVolume || false));
           localStorage.setItem("dummy_aiUseHeikinAshi", String(data.useHeikinAshi !== false));
           localStorage.setItem("dummy_aiProvider", data.provider);
@@ -232,6 +238,7 @@ export default function SettingsDesktop() {
         const aiCandles = localStorage.getItem("dummy_aiCandlesCount");
         const aiRecentCandles = localStorage.getItem("dummy_aiRecentCandlesCount");
         const aiEntryBuffer = localStorage.getItem("dummy_aiEntryBufferMaxCandles");
+        const aiExitBuffer = localStorage.getItem("dummy_aiExitBufferCandles");
         const aiVol = localStorage.getItem("dummy_aiConsiderVolume");
         const aiHA = localStorage.getItem("dummy_aiUseHeikinAshi");
         const aiProv = localStorage.getItem("dummy_aiProvider");
@@ -245,6 +252,7 @@ export default function SettingsDesktop() {
           candlesCount: aiCandles ? parseInt(aiCandles, 10) : 120,
           recentCandlesCount: aiRecentCandles ? parseInt(aiRecentCandles, 10) : 30,
           entryBufferMaxCandles: aiEntryBuffer ? parseInt(aiEntryBuffer, 10) : 1,
+          exitBufferCandles: aiExitBuffer ? parseInt(aiExitBuffer, 10) : 3,
           considerVolume: aiVol === "true" ? true : false,
           useHeikinAshi: aiHA === "true" ? true : true,
           provider: aiProv || "local",
@@ -284,6 +292,7 @@ export default function SettingsDesktop() {
           candlesCount: aiSettings.candlesCount,
           recentCandlesCount: aiSettings.recentCandlesCount,
           entryBufferMaxCandles: aiSettings.entryBufferMaxCandles,
+          exitBufferCandles: aiSettings.exitBufferCandles,
           considerVolume: aiSettings.considerVolume,
           useHeikinAshi: aiSettings.useHeikinAshi,
           provider: aiSettings.provider,
@@ -895,6 +904,15 @@ export default function SettingsDesktop() {
                           />
                         </button>
                       </div>
+                      {aiAutoExitEnabled && (
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold" style={{ color: "var(--theme-popup-text)" }}>Exit buffer (sideways)</label>
+                          <div className="flex items-center gap-1.5">
+                            <ClampedNumericField value={aiExitBufferCandles} onChange={(val) => updateAiSettings({ exitBufferCandles: val })} min={1} max={30} className="w-14 h-7 rounded border border-black/10 text-center font-bold text-xs" style={{ background: "var(--theme-popup-bg)", color: "var(--theme-accent-gold, var(--theme-popup-text))", borderColor: "var(--theme-popup-field-border)" }} />
+                            <span className="text-[10px]" style={{ color: "var(--theme-popup-label)" }}>candles</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* AI Provider */}
