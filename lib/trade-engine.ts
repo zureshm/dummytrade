@@ -24,7 +24,7 @@ import path from "path";
 
 import { getAiGuardSettings, isAiGuardActive, analyzeMarketRegime, loadAiSettingsFromDisk, addAiLog, addAiErrorLog, type AiSuggestion, type AiAnalysisResult } from "./ai-guard";
 
-import { checkNiftyReEntryFilter } from "./nifty-live";
+
 
 
 
@@ -904,7 +904,7 @@ function loadState() {
 
       if (typeof data.watchdogEnabled === "boolean") watchdogEnabled = data.watchdogEnabled;
       if (Array.isArray(data.watchdogCheckpoints)) {
-        watchdogCheckpoints = data.watchdogCheckpoints.slice(0, DEFAULT_WATCHDOG_CHECKPOINTS.length).map((cp: any, idx: number) => ({
+        watchdogCheckpoints = data.watchdogCheckpoints.slice(0, DEFAULT_WATCHDOG_CHECKPOINTS.length).map((cp: { points?: unknown; breakBelow?: unknown }, idx: number) => ({
           points: typeof cp.points === "number" ? cp.points : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.points ?? 0),
           breakBelow: typeof cp.breakBelow === "number" ? cp.breakBelow : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.breakBelow ?? 0),
         }));
@@ -917,6 +917,20 @@ function loadState() {
       if (data.niftySignalBinding && typeof data.niftySignalBinding === "object") {
         for (const [k, v] of Object.entries(data.niftySignalBinding)) {
           if (v === "FAKE_CE" || v === "FAKE_PE") niftySignalBinding[k] = v;
+        }
+      }
+
+      if (Array.isArray(data.symbolsWithFirstSignal)) {
+        for (const s of data.symbolsWithFirstSignal) {
+          if (typeof s === "string") symbolsWithFirstSignal.add(s);
+        }
+      }
+      if (data.symbolHistoryStatus && typeof data.symbolHistoryStatus === "object") {
+        for (const [k, v] of Object.entries(data.symbolHistoryStatus)) {
+          const entry = v as { status?: unknown; candleCount?: unknown } | null;
+          if (entry && typeof entry.status === "string") {
+            symbolHistoryStatus[k] = { status: entry.status, candleCount: Number(entry.candleCount) || 0 };
+          }
         }
       }
 
@@ -972,6 +986,8 @@ function persistState() {
       watchdogEnabled,
       watchdogCheckpoints,
       niftySignalBinding,
+      symbolsWithFirstSignal: [...symbolsWithFirstSignal],
+      symbolHistoryStatus,
     }, null, 2);
 
 
@@ -3601,15 +3617,6 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
           const startCandle = trade.reEntryStartCandle ?? 1;
           if (candlesSinceSell <= trade.reEntryCandles) {
             if (candlesSinceSell >= startCandle && ltp > reEntryThreshold) {
-              // NIFTY 50 technical guard (EMA 10/20 trend, candle color, 6-candle EMA20 non-touch)
-              const niftyCheck = checkNiftyReEntryFilter(trade.symbol);
-              if (!niftyCheck.allowed) {
-                if (lastReEntryBlockedCandle[trade.symbol] !== lastStrategyCandleTime) {
-                  lastReEntryBlockedCandle[trade.symbol] = lastStrategyCandleTime;
-                  addLogToActive(trade.symbol, `RE-ENTRY blocked — ${niftyCheck.reason} at ${currentTime}`);
-                }
-                continue;
-              }
               // AI Re-Entry Guard check — block re-entry if AI says sideways/reversing
               const aiSettings = getAiGuardSettings();
               if (aiSettings.reEntryGuardEnabled && isAiGuardActive() && aiSymbolEnabled[trade.symbol] === true) {
@@ -4285,9 +4292,15 @@ export function getEngineState() {
 
 
 
-// Force a symbol into the initialized set — user accepts running without full history
+// Force a symbol into the initialized set — user accepts running without full history.
+// Stamps status "ready" so the history poll loops stop and can't overwrite it
+// with "failed" afterwards; persisted so a restart keeps the init.
 export function forceInitSymbol(symbol: string) {
+  symbolHistoryStatus[symbol] = { status: "ready", candleCount: symbolHistoryStatus[symbol]?.candleCount || 0 };
   symbolsWithFirstSignal.add(symbol);
+  pushHistoryLog(`${symbol} force-initialized — marked ready without history`);
+  addLogToWaiting(symbol, `Force Init — marked ready (history check bypassed)`);
+  persistState();
 }
 
 // "Use Nifty" — bind a symbol's strategy signals to the FAKE_CE / FAKE_PE
