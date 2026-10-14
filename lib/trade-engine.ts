@@ -945,6 +945,11 @@ function loadState() {
           if (typeof v === "string") lastBuyCandleTime[k] = v;
         }
       }
+      if (data.lastCandleTimeMap && typeof data.lastCandleTimeMap === "object") {
+        for (const [k, v] of Object.entries(data.lastCandleTimeMap)) {
+          if (typeof v === "string") lastCandleTimeMap[k] = v;
+        }
+      }
 
       console.log(`[trade-engine] Loaded state from ${DB_PATH} (${waitingTrades.length} waiting, ${activeTrades.length} active) and ${tradeHistory.length} history from ${HISTORY_DB_PATH}`);
 
@@ -1001,6 +1006,7 @@ function persistState() {
       symbolsWithFirstSignal: [...symbolsWithFirstSignal],
       symbolHistoryStatus,
       lastBuyCandleTime,
+      lastCandleTimeMap,
     }, null, 2);
 
 
@@ -1516,7 +1522,7 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
 
 
     entryTime: logLine.includes("at ") ? logLine.split("at ")[1] : undefined,
-    entryCandleTime: lastStrategyCandleTime,
+    entryCandleTime: lastCandleTimeMap[symbol] || lastStrategyCandleTime,
     entryTimestamp: Date.now(),
 
 
@@ -1634,7 +1640,7 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
   lastBuyTimestamp[symbol] = Date.now();
 
   // Track the candle time of this BUY so strategy exit signals on the same candle are blocked
-  lastBuyCandleTime[symbol] = lastStrategyCandleTime;
+  lastBuyCandleTime[symbol] = lastCandleTimeMap[symbol] || lastStrategyCandleTime;
 
   delete tradeAddedCandleTime[symbol];
 }
@@ -2241,7 +2247,7 @@ function updateActiveTradeBuy(symbol: string, entryPrice: string, logLine: strin
 
 
       entryTime: logLine.includes("at ") ? logLine.split("at ")[1] : undefined,
-      entryCandleTime: lastStrategyCandleTime,
+      entryCandleTime: lastCandleTimeMap[symbol] || lastStrategyCandleTime,
       entryTimestamp: Date.now(),
 
 
@@ -2291,7 +2297,7 @@ function updateActiveTradeBuy(symbol: string, entryPrice: string, logLine: strin
   lastBuyTimestamp[symbol] = Date.now();
 
   // Track the candle time of this BUY so strategy exit signals on the same candle are blocked
-  lastBuyCandleTime[symbol] = lastStrategyCandleTime;
+  lastBuyCandleTime[symbol] = lastCandleTimeMap[symbol] || lastStrategyCandleTime;
 
   delete tradeAddedCandleTime[symbol];
 }
@@ -2767,8 +2773,6 @@ function handleStrategySignal(signal: any) {
           } else if (activeTrade2 && !activeTrade2.inPosition) {
             updateActiveTradeBuy(signalSymbol, entryPrice, fireLog);
           }
-          // Override lastBuyCandleTime with the buffer's original candle time (not stale lastStrategyCandleTime)
-          if (buffered.bufferedCandleTime) lastBuyCandleTime[signalSymbol] = buffered.bufferedCandleTime;
           delete pendingBuyBuffer[signalSymbol];
           setPendingSkippedBuy(signalSymbol, false);
           addAiLog(`[ai-guard] Buffered BUY fired for ${signalSymbol}: upwards confirmed after ${buffered.candlesElapsed} candle(s)`);
@@ -2884,10 +2888,12 @@ function handleStrategySignal(signal: any) {
     if (lastBuyCandleTime[signalSymbol] && signal.lastCandleTime === lastBuyCandleTime[signalSymbol]) return;
     if (lastBuyTimestamp[signalSymbol] && (Date.now() - lastBuyTimestamp[signalSymbol]) < BUY_GRACE_PERIOD_MS) return;
     // Block exit signals from candles strictly older than entry candle (persisted guard — survives restart)
+    // Bounded to 4h so a next-session signal (e.g. entry 15:29, signal 09:15 next day) is never misclassified as stale
     if (activeForSymbol.entryCandleTime) {
       const entryMin = toMinutes(activeForSymbol.entryCandleTime);
       const signalMin = toMinutes(signal.lastCandleTime);
-      if (entryMin >= 0 && signalMin >= 0 && signalMin < entryMin) return;
+      const gap = entryMin - signalMin;
+      if (entryMin >= 0 && signalMin >= 0 && gap > 0 && gap <= 240) return;
     }
     if (activeForSymbol.entryTimestamp && (Date.now() - activeForSymbol.entryTimestamp) < BUY_GRACE_PERIOD_MS) return;
 
@@ -2937,10 +2943,12 @@ function handleStrategySignal(signal: any) {
     if (lastBuyCandleTime[signalSymbol] && signal.lastCandleTime === lastBuyCandleTime[signalSymbol]) return;
     if (lastBuyTimestamp[signalSymbol] && (Date.now() - lastBuyTimestamp[signalSymbol]) < BUY_GRACE_PERIOD_MS) return;
     // Block exit signals from candles strictly older than entry candle (persisted guard — survives restart)
+    // Bounded to 4h so a next-session signal (e.g. entry 15:29, signal 09:15 next day) is never misclassified as stale
     if (activeForSymbol.entryCandleTime) {
       const entryMin = toMinutes(activeForSymbol.entryCandleTime);
       const signalMin = toMinutes(signal.lastCandleTime);
-      if (entryMin >= 0 && signalMin >= 0 && signalMin < entryMin) return;
+      const gap = entryMin - signalMin;
+      if (entryMin >= 0 && signalMin >= 0 && gap > 0 && gap <= 240) return;
     }
     if (activeForSymbol.entryTimestamp && (Date.now() - activeForSymbol.entryTimestamp) < BUY_GRACE_PERIOD_MS) return;
 
@@ -3008,10 +3016,12 @@ function handleStrategySignal(signal: any) {
     if (lastBuyCandleTime[signalSymbol] && signal.lastCandleTime === lastBuyCandleTime[signalSymbol]) return;
     if (lastBuyTimestamp[signalSymbol] && (Date.now() - lastBuyTimestamp[signalSymbol]) < BUY_GRACE_PERIOD_MS) return;
     // Block exit signals from candles strictly older than entry candle (persisted guard — survives restart)
+    // Bounded to 4h so a next-session signal (e.g. entry 15:29, signal 09:15 next day) is never misclassified as stale
     if (activeForSymbol.entryCandleTime) {
       const entryMin = toMinutes(activeForSymbol.entryCandleTime);
       const signalMin = toMinutes(signal.lastCandleTime);
-      if (entryMin >= 0 && signalMin >= 0 && signalMin < entryMin) return;
+      const gap = entryMin - signalMin;
+      if (entryMin >= 0 && signalMin >= 0 && gap > 0 && gap <= 240) return;
     }
     if (activeForSymbol.entryTimestamp && (Date.now() - activeForSymbol.entryTimestamp) < BUY_GRACE_PERIOD_MS) return;
 
@@ -3061,10 +3071,12 @@ function handleStrategySignal(signal: any) {
     if (lastBuyCandleTime[signalSymbol] && signal.lastCandleTime === lastBuyCandleTime[signalSymbol]) return;
     if (lastBuyTimestamp[signalSymbol] && (Date.now() - lastBuyTimestamp[signalSymbol]) < BUY_GRACE_PERIOD_MS) return;
     // Block exit signals from candles strictly older than entry candle (persisted guard — survives restart)
+    // Bounded to 4h so a next-session signal (e.g. entry 15:29, signal 09:15 next day) is never misclassified as stale
     if (activeForSymbol.entryCandleTime) {
       const entryMin = toMinutes(activeForSymbol.entryCandleTime);
       const signalMin = toMinutes(signal.lastCandleTime);
-      if (entryMin >= 0 && signalMin >= 0 && signalMin < entryMin) return;
+      const gap = entryMin - signalMin;
+      if (entryMin >= 0 && signalMin >= 0 && gap > 0 && gap <= 240) return;
     }
     if (activeForSymbol.entryTimestamp && (Date.now() - activeForSymbol.entryTimestamp) < BUY_GRACE_PERIOD_MS) return;
 
