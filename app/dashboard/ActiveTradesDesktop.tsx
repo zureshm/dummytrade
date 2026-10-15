@@ -6,6 +6,7 @@ import styles from "./ActiveTrade.module.scss";
 import type { ActiveTrade as ActiveTradeType, WaitingTrade } from "../store/TradeStore";
 import { useTradeStore } from "../store/TradeStore";
 import { BASE_PATH } from "@/lib/basePath";
+import { sortSymbolsByPairs } from "@/lib/symbol-sort";
 
 function TradeLogsConsole({ logs }: { logs: string[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -121,7 +122,7 @@ export default function ActiveTradesDesktop({
   }, []);
 
   const safeActiveTrades = mounted ? activeTrades : [];
-  const safeWaitingTrades = mounted ? waitingTrades : [];
+  const safeWaitingTrades = sortSymbolsByPairs(mounted ? waitingTrades : [], (t) => t.symbol);
 
   const renderAiRegimeBadge = (symbol: string, marginLeft = 6) => {
     if (!aiGuardActive || !aiSymbolEnabled[symbol]) return null;
