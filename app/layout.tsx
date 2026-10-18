@@ -5,6 +5,7 @@ import { TradeStoreProvider } from "./store/TradeStore";
 import { WatchlistProvider } from "./store/WatchlistContext";
 import { StrategyTimerProvider } from "./components/StrategyTimerProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import AppShell from "./components/AppShell";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -36,9 +37,7 @@ export default function RootLayout({
           <TradeStoreProvider>
             <StrategyTimerProvider>
               <WatchlistProvider>
-                <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-                  {children}
-                </div>
+                <AppShell>{children}</AppShell>
               </WatchlistProvider>
             </StrategyTimerProvider>
           </TradeStoreProvider>

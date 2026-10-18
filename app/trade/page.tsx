@@ -90,7 +90,7 @@ function NumericField({ value, onChange, onBlur, fallback = "0", ...props }: Num
 
 export default function TradePage() {
   const router = useRouter();
-  const { selection, addWaitingTradeFromSelection, waitingTrades, activeTrades, updateActiveTradeConfig } = useTradeStore();
+  const { selection, addWaitingTradeFromSelection, waitingTrades, activeTrades } = useTradeStore();
   const [currentPrice, setCurrentPrice] = useState<string | null>(null);
   const [lotValue, setLotValue] = useState(1);
 
@@ -238,7 +238,7 @@ export default function TradePage() {
 
   const isAlreadyWaiting = selection && waitingTrades.some((trade: WaitingTrade) => trade.symbol === selection.symbol);
   const isAlreadyActive = selection && activeTrades.some((trade) => trade.symbol === selection.symbol && trade.status === "ACTIVE");
-  const buttonText = isAlreadyActive ? "OVERRIDE" : (isAlreadyWaiting ? "UPDATE" : "ENTER");
+  const buttonText = isAlreadyWaiting ? "UPDATE" : "ENTER";
 
   const lotSize: number = selection?.symbol?.startsWith("SENSEX") ? 20 : 65;
 
@@ -1539,73 +1539,10 @@ export default function TradePage() {
             </div>
 
             <div className="flex space-x-3">
+              {!isAlreadyActive && (
               <Button
                 onClick={() => {
                   if (selection?.symbol) {
-                    if (isAlreadyActive) {
-                      // OVERRIDE: update config of running trade (safe fields only)
-                      const configPayload = {
-                        stopLossNumberEnabled: stopLossNumberEnabled || stopLossPercentageEnabled,
-                        stopLossNumber,
-                        trailingStopLossEnabled,
-                        trailingStopLossSteps,
-                        targetPointsEnabled,
-                        targetPoints,
-                        targetMode,
-                        minToHoldEnabled,
-                        minToHold,
-                        minToHoldTrigger,
-                        minToHoldMode,
-                        minToHoldArmMode,
-                        trailingAfterTargetEnabled,
-                        trailingAfterTarget,
-                        trailingMode,
-                        rangeEnabled,
-                        timeFrom,
-                        timeFromAmpm,
-                        timeTo,
-                        timeToAmpm,
-                        buyOverride: waitStrategyEnabled ? (buyOverrideSize || undefined) : undefined,
-                        waitAfterSellEnabled,
-                        waitAfterSellCandles,
-                        sellWhenLossCandlesEnabled,
-                        sellWhenLossCandles,
-                        maxProfitLossEnabled,
-                        maxProfit,
-                        maxLoss,
-                        reEntryAfterTargetEnabled,
-                        reEntryStartCandle,
-                        reEntryCandles,
-                        reEntryPoints,
-                        reEntryStopLossEnabled,
-                        reEntryStopLoss,
-                        reEntryAsTrailingEnabled,
-                        reEntryTrailingPoints,
-                        reEntryMinTargetEnabled,
-                        reEntryMinTargetPoints,
-                        reEntryMinTargetTrigger,
-                        reEntryMinTargetTrailing: reEntryMinTargetTrailing === "yes",
-                        minToHoldTrailing: minToHoldTrailing === "yes",
-                        signalReEntryEnabled,
-                        triggerTimerEnabled,
-                        triggerTimeEnabled,
-                        triggerPriceEnabled,
-                        triggerHours,
-                        triggerMinutes,
-                        triggerSeconds,
-                        triggerMinPrice,
-                        triggerMaxPrice,
-                      };
-                      fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(selection.symbol)}/config`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(configPayload),
-                      }).catch(() => {});
-                      updateActiveTradeConfig(selection.symbol, configPayload);
-                      router.push("/dashboard");
-                      return;
-                    }
-
                     // ENTER or UPDATE: add/update waiting trade
                     // Tell angel-feed backend which symbol is now the active live symbol
                       setActiveSymbol(selection.symbol).catch(() => {});
@@ -1688,12 +1625,13 @@ export default function TradePage() {
               >
                 {buttonText}
               </Button>
-              <Button 
-                variant="outline" 
+              )}
+              <Button
+                variant="outline"
                 onClick={() => router.push("/dashboard")}
                 className="flex-1"
               >
-                CANCEL
+                GO BACK
               </Button>
             </div>
           </div>

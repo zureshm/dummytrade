@@ -143,3 +143,10 @@ body {
 }
 
 
+
+@layer utilities {
+  /* Desktop view: remove rounding on main section cards */
+  .desktop-view .dashboard-container > [data-slot="card"] {
+    border-radius: 0;
+  }
+}
