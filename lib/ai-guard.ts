@@ -34,11 +34,13 @@ export function clearAiLogs(): void {
 export type AiGuardSettings = {
   enabled: boolean;
   entryGuardEnabled: boolean;
+  reEntryGuardEnabled: boolean;
   autoExitEnabled: boolean;
   confidenceThreshold: number;
   candlesCount: number;
   recentCandlesCount: number;
   entryBufferMaxCandles: number;
+  exitBufferCandles: number;
   considerVolume: boolean;
   useHeikinAshi: boolean;
   provider: string;
@@ -82,6 +84,7 @@ export type AiSuggestion = {
 const DEFAULT_SETTINGS: AiGuardSettings = {
   enabled: false,
   entryGuardEnabled: false,
+  reEntryGuardEnabled: false,
   autoExitEnabled: false,
   confidenceThreshold: 70,
   candlesCount: 90,
@@ -89,6 +92,7 @@ const DEFAULT_SETTINGS: AiGuardSettings = {
   model: "openai/gpt-oss-120b",
   recentCandlesCount: 30,
   entryBufferMaxCandles: 1,
+  exitBufferCandles: 3,
   considerVolume: false,
   useHeikinAshi: true,
   apiKeys: [],
