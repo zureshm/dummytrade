@@ -52,6 +52,7 @@ export type WaitingTrade = {
   reEntryStartCandle: number;
   reEntryCandles: number;
   reEntryPoints: number;
+  reEntryPeakCandles?: number;
   reEntryStopLossEnabled: boolean;
   reEntryStopLoss: number;
   reEntryAsTrailingEnabled: boolean;
@@ -124,6 +125,7 @@ export type ActiveTrade = {
   reEntryStartCandle: number;
   reEntryCandles: number;
   reEntryPoints: number;
+  reEntryPeakCandles?: number;
   reEntryStopLossEnabled: boolean;
   reEntryStopLoss: number;
   reEntryAsTrailingEnabled: boolean;
@@ -489,6 +491,7 @@ export function TradeStoreProvider({
       reEntryStartCandle: readFormNumber(sym, "reEntryStartCandle", 1),
       reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
       reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
+      reEntryPeakCandles: readFormNumber(sym, "reEntryPeakCandles", 30),
       reEntryStopLossEnabled: readFormBool(sym, "reEntryStopLossEnabled", true),
       reEntryStopLoss: readFormNumber(sym, "reEntryStopLoss", 5),
       reEntryAsTrailingEnabled: readFormBool(sym, "reEntryAsTrailingEnabled", true),
@@ -599,6 +602,7 @@ export function TradeStoreProvider({
       reEntryStartCandle: tradeToActivate.reEntryStartCandle ?? 1,
       reEntryCandles: tradeToActivate.reEntryCandles,
       reEntryPoints: tradeToActivate.reEntryPoints,
+      reEntryPeakCandles: tradeToActivate.reEntryPeakCandles ?? 30,
       reEntryStopLossEnabled: tradeToActivate.reEntryStopLossEnabled,
       reEntryStopLoss: tradeToActivate.reEntryStopLoss,
       reEntryAsTrailingEnabled: tradeToActivate.reEntryAsTrailingEnabled,

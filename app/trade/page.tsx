@@ -138,6 +138,7 @@ export default function TradePage() {
     setReEntryStartCandle(defaults.reEntryStartCandle ?? 1);
     setReEntryCandles(defaults.reEntryCandles);
     setReEntryPoints(defaults.reEntryPoints);
+    setReEntryPeakCandles(defaults.reEntryPeakCandles ?? 30);
     setReEntryStopLossEnabled(defaults.reEntryStopLossEnabled ?? true);
     setReEntryStopLoss(defaults.reEntryStopLoss ?? 5);
     setReEntryAsTrailingEnabled(defaults.reEntryAsTrailingEnabled ?? true);
@@ -188,6 +189,7 @@ export default function TradePage() {
   const [reEntryStartCandle, setReEntryStartCandle] = useState(1);
   const [reEntryCandles, setReEntryCandles] = useState(5);
   const [reEntryPoints, setReEntryPoints] = useState(3);
+  const [reEntryPeakCandles, setReEntryPeakCandles] = useState(30);
   const [isReEntryInfoOpen, setIsReEntryInfoOpen] = useState(false);
   const [reEntryStopLossEnabled, setReEntryStopLossEnabled] = useState(true);
   const [reEntryStopLoss, setReEntryStopLoss] = useState(5);
@@ -321,6 +323,7 @@ export default function TradePage() {
         setReEntryStartCandle(data.reEntryStartCandle ?? 1);
         setReEntryCandles(data.reEntryCandles || 5);
         setReEntryPoints(data.reEntryPoints || 3);
+        setReEntryPeakCandles(data.reEntryPeakCandles || 30);
         setReEntryStopLossEnabled(Boolean(data.reEntryStopLossEnabled ?? true));
         setReEntryStopLoss(data.reEntryStopLoss || 5);
         setReEntryAsTrailingEnabled(Boolean(data.reEntryAsTrailingEnabled ?? true));
@@ -391,6 +394,7 @@ export default function TradePage() {
       reEntryStartCandle,
       reEntryCandles,
       reEntryPoints,
+      reEntryPeakCandles,
       reEntryStopLossEnabled,
       reEntryStopLoss,
       reEntryAsTrailingEnabled,
@@ -1143,7 +1147,7 @@ export default function TradePage() {
                           lineHeight: "18px",
                         }}
                       >
-                        After exiting with a profit (target, trailing SL, or minimum target), if the price trends back up and exceeds the exit price within the specified candles, a new buy is triggered — but only if Strategy sends UPWARDS is true. If UPWARDS is false or unavailable, re-entry is blocked. Does not apply for stop-loss or loss exits.
+                        After a profitable exit (target, trailing SL, or minimum target), re-entry arms for the specified candle window. A new buy fires only when the price crosses the highest close of the last N candles + Plus points, and the 10-EMA sits above the 30-EMA with a widening gap. Stop-loss or losing exits do not arm it.
                       </div>
                     )}
                   </div>
@@ -1182,6 +1186,19 @@ export default function TradePage() {
                     disabled={!reEntryAfterTargetEnabled}
                   />
                   <span className={`text-sm ${reEntryAfterTargetEnabled ? "" : "text-gray-400"}`}>Candles</span>
+                </div>
+
+                <div className="flex items-center space-x-2 pl-6">
+                  <label className={`text-sm ${reEntryAfterTargetEnabled ? "" : "text-gray-400"}`}>Based on last</label>
+                  <NumericField
+                    value={reEntryPeakCandles}
+                    onChange={setReEntryPeakCandles}
+                    className="w-8 h-8 px-1 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm text-center"
+                    min="1"
+                    max="99"
+                    disabled={!reEntryAfterTargetEnabled}
+                  />
+                  <span className={`text-sm ${reEntryAfterTargetEnabled ? "" : "text-gray-400"}`}>candles peak</span>
                 </div>
               </div>
 
@@ -1594,6 +1611,7 @@ export default function TradePage() {
                         reEntryStartCandle,
                         reEntryCandles,
                         reEntryPoints,
+                        reEntryPeakCandles,
                         reEntryStopLossEnabled,
                         reEntryStopLoss,
                         reEntryAsTrailingEnabled,
