@@ -71,6 +71,7 @@ export type WaitingTrade = {
   triggerSeconds?: number;
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
+  autoTriggerBuyPrice?: number;
 };
 export type ActiveTrade = {
   symbol: string;
@@ -149,6 +150,7 @@ export type ActiveTrade = {
   triggerSeconds?: number;
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
+  autoTriggerBuyPrice?: number;
 };
 
 export type AiSuggestion = {
