@@ -151,6 +151,7 @@ export type ActiveTrade = {
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
   autoTriggerBuyPrice?: number;
+  autoExecuteExitPrice?: number;
 };
 
 export type AiSuggestion = {

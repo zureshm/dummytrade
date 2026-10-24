@@ -382,6 +382,8 @@ type ActiveTrade = {
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
   autoTriggerBuyPrice?: number;
+  autoExecuteExitPrice?: number;
+  autoExecuteExitDir?: "up" | "down";
 };
 
 type TradeHistoryItem = {
@@ -1916,6 +1918,12 @@ function forceExitTrade(symbol: string, exitPrice: string, totalPnl: number, log
 
   queueSound("exit");
 
+  const exitTradeRef = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE");
+  if (exitTradeRef) {
+    delete exitTradeRef.autoExecuteExitPrice;
+    delete exitTradeRef.autoExecuteExitDir;
+  }
+
   activeTrades = activeTrades.map((trade) => {
 
     if (trade.symbol !== symbol || trade.status !== "ACTIVE") return trade;
@@ -1998,6 +2006,14 @@ function forceExitTrade(symbol: string, exitPrice: string, totalPnl: number, log
 function completeCycleWithoutExit(symbol: string, exitPrice: string, logLine: string) {
 
 
+
+  // A completed cycle must not carry an armed Auto Execute Exit into the
+  // next cycle — clear before the map spreads the trade object.
+  const cycleTrade = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE");
+  if (cycleTrade) {
+    delete cycleTrade.autoExecuteExitPrice;
+    delete cycleTrade.autoExecuteExitDir;
+  }
 
   activeTrades = activeTrades.map((trade) => {
 
@@ -3900,10 +3916,28 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
     if (lastBuyTimestamp[trade.symbol] && (Date.now() - lastBuyTimestamp[trade.symbol]) < BUY_GRACE_PERIOD_MS) continue;
     if (trade.entryTimestamp && (Date.now() - trade.entryTimestamp) < BUY_GRACE_PERIOD_MS) continue;
 
-
-
-
-
+    // ── Auto Execute Exit — user-armed exit level (manual exit in a
+    // back-and-forth market). Direction latches on first evaluation:
+    // trigger above market = target (ltp >= price), below = stop
+    // (ltp <= price). Only ever evaluated while inPosition.
+    if (trade.autoExecuteExitPrice != null && Number.isFinite(trade.autoExecuteExitPrice)) {
+      const exitTrigger = trade.autoExecuteExitPrice;
+      let dir = trade.autoExecuteExitDir;
+      if (dir !== "up" && dir !== "down") {
+        dir = ltp <= exitTrigger ? "up" : "down";
+        trade.autoExecuteExitDir = dir;
+        persistState();
+      }
+      const hit = dir === "up" ? ltp >= exitTrigger : ltp <= exitTrigger;
+      if (hit) {
+        triggeredPositions.add(positionKey);
+        trailingArmedPositions.delete(positionKey);
+        delete trade.autoExecuteExitPrice;
+        delete trade.autoExecuteExitDir;
+        completeCycleWithoutExit(trade.symbol, String(ltp), `AUTO EXECUTE EXIT triggered for ₹${ltp} (${dir === "up" ? "reached" : "dropped to"} ₹${exitTrigger}) at ${currentTime}`);
+        continue;
+      }
+    }
 
     const trailingEnabled = trade.targetPointsEnabled && trade.targetPoints > 0 && trade.trailingAfterTargetEnabled && trade.trailingAfterTarget > 0;
 
@@ -4898,6 +4932,26 @@ export function resetAutoTriggerBuyPrice(symbol: string): boolean {
     return true;
   }
   return false;
+}
+
+export function setAutoExecuteExitPrice(symbol: string, triggerPrice: number): boolean {
+  const active = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE" && t.inPosition);
+  if (!active) return false;
+  active.autoExecuteExitPrice = triggerPrice;
+  delete active.autoExecuteExitDir;
+  addLogToActive(symbol, `Auto Execute Exit set to ₹${triggerPrice}`);
+  persistState();
+  return true;
+}
+
+export function resetAutoExecuteExitPrice(symbol: string): boolean {
+  const active = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE");
+  if (!active) return false;
+  delete active.autoExecuteExitPrice;
+  delete active.autoExecuteExitDir;
+  addLogToActive(symbol, `Auto Execute Exit reset (cleared)`);
+  persistState();
+  return true;
 }
 
 
