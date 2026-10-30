@@ -179,6 +179,7 @@ type WaitingTrade = {
   stopLossNumber: number;
   trailingStopLossEnabled: boolean;
   trailingStopLossSteps: number;
+  slMode?: "live" | "candleClose";
   targetPointsEnabled: boolean;
 
 
@@ -312,6 +313,7 @@ type ActiveTrade = {
   stopLossNumber: number;
   trailingStopLossEnabled: boolean;
   trailingStopLossSteps: number;
+  slMode?: "live" | "candleClose";
   targetPointsEnabled: boolean;
   targetPoints: number;
   targetMode: "live" | "candleClose";
@@ -422,6 +424,7 @@ type TradeHistoryItem = {
     stopLossNumberEnabled: boolean;
     trailingStopLossEnabled?: boolean;
     trailingStopLossSteps?: number;
+    slMode?: "live" | "candleClose";
 
 
 
@@ -1269,6 +1272,7 @@ function buildConfigSnapshot(trade: ActiveTrade): TradeHistoryItem["config"] {
     stopLossNumber: trade.stopLossNumberEnabled ? trade.stopLossNumber : undefined,
     trailingStopLossEnabled: Boolean(trade.trailingStopLossEnabled),
     trailingStopLossSteps: trade.trailingStopLossEnabled ? trade.trailingStopLossSteps : undefined,
+    slMode: trade.stopLossNumberEnabled ? trade.slMode : undefined,
 
 
 
@@ -1470,6 +1474,7 @@ function activateWaitingTrade(symbol: string, entryPrice: string, logLine: strin
     stopLossNumber: trade.stopLossNumber,
     trailingStopLossEnabled: trade.trailingStopLossEnabled,
     trailingStopLossSteps: trade.trailingStopLossSteps,
+    slMode: trade.slMode,
     trailingSlHighWatermark: Number(entryPrice),
 
 
@@ -3656,6 +3661,7 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
     const useCloseForTrailing = isBacktestMode || trade.trailingMode === "candleClose";
     const useCloseForMinArm = isBacktestMode || trade.minToHoldArmMode === "candleClose";
     const useCloseForMinTrigger = isBacktestMode || trade.minToHoldMode === "candleClose";
+    const useCloseForSL = isBacktestMode || trade.slMode === "candleClose";
 
     const targetPrice = useCloseForTarget && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
 
@@ -3663,6 +3669,8 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
 
     const minTargetArmPrice = useCloseForMinArm && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
     const minTargetTriggerPrice = useCloseForMinTrigger && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
+
+    const slPrice = useCloseForSL && Number.isFinite(lastCandleCloseMap[trade.symbol]) ? lastCandleCloseMap[trade.symbol] : ltp;
 
 
 
@@ -3956,10 +3964,10 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
     let trailedSLLevel = entry - (effectiveSL || 0);
     let slStepsCompleted = 0;
     if (effectiveSLEnabled && effectiveSL > 0) {
-      if (typeof trade.trailingSlHighWatermark !== "number" || ltp > trade.trailingSlHighWatermark) {
-        updateTrailingSlHighWatermark(trade.symbol, ltp);
+      if (typeof trade.trailingSlHighWatermark !== "number" || slPrice > trade.trailingSlHighWatermark) {
+        updateTrailingSlHighWatermark(trade.symbol, slPrice);
       }
-      const slHighMark = Math.max(trade.trailingSlHighWatermark ?? entry, ltp);
+      const slHighMark = Math.max(trade.trailingSlHighWatermark ?? entry, slPrice);
       if (trade.trailingStopLossEnabled && trade.trailingStopLossSteps > 0) {
         const slGain = Math.max(0, slHighMark - entry);
         slStepsCompleted = Math.floor(slGain / trade.trailingStopLossSteps);
@@ -4105,8 +4113,8 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
     }
 
     // Stop loss hit (Standard or Trailed)
-    if (effectiveSLEnabled && effectiveSL > 0 && ltp <= trailedSLLevel) {
-      const slExit = ltp <= trailedSLLevel ? ltp : trailedSLLevel;
+    if (effectiveSLEnabled && effectiveSL > 0 && slPrice <= trailedSLLevel) {
+      const slExit = slPrice <= trailedSLLevel ? slPrice : trailedSLLevel;
       triggeredPositions.add(positionKey);
       trailingArmedPositions.delete(positionKey);
 
