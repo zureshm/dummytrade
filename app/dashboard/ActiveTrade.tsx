@@ -10,6 +10,7 @@ import type { ActiveTrade as ActiveTradeType, WaitingTrade } from "../store/Trad
 import { useTradeStore } from "../store/TradeStore";
 import { BASE_PATH } from "@/lib/basePath";
 import { sortSymbolsByPairs } from "@/lib/symbol-sort";
+import { AutoTriggerRow, AutoExecuteExitRow } from "./TriggerRows";
 
 function TradeLogsConsole({ logs }: { logs: string[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -511,6 +512,18 @@ export default function ActiveTrade({
                 </div>
               )}
 
+              {forceBuyEnabled && (
+                <div style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+                  marginTop: 10, padding: "10px 12px", borderRadius: 10,
+                  border: "1px solid var(--theme-popup-field-border)",
+                  background: "var(--theme-popup-field-bg)",
+                }}>
+                  <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoTriggerBuyPrice={t.autoTriggerBuyPrice} labelOnTop />
+                  <AutoExecuteExitRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoExecuteExitPrice={t.autoExecuteExitPrice} labelOnTop />
+                </div>
+              )}
+
               {/* Trade Configuration */}
               <div className={styles.tradeConfig}>
                 <div className="text-xs" style={{ color: "var(--theme-text-gray-500)" }}>
@@ -833,6 +846,17 @@ export default function ActiveTrade({
                     </div>
                   );
                 })()}
+
+                {forceBuyEnabled && (
+                  <div style={{
+                    display: "flex", justifyContent: "center",
+                    marginTop: 10, padding: "10px 12px", borderRadius: 10,
+                    border: "1px solid var(--theme-popup-field-border)",
+                    background: "var(--theme-popup-field-bg)",
+                  }}>
+                    <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={false} autoTriggerBuyPrice={t.autoTriggerBuyPrice} labelOnTop />
+                  </div>
+                )}
 
                 {/* Trade Configuration for Waiting Trades */}
                 <div className={styles.tradeConfig}>
