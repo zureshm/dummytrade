@@ -156,7 +156,8 @@ export default function Watchlist() {
     const interval = setInterval(fetchPrices, 1000);
 
     return () => clearInterval(interval);
-  }, [watchlist.length, updateWatchlistPrices, watchlist]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchlist.length, updateWatchlistPrices]);
 
   useEffect(() => {
     const text = searchText.trim();
@@ -179,7 +180,7 @@ export default function Watchlist() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchText, watchlist]);
+  }, [searchText]);
 
   return (
     <Card className="w-full">

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useRef, type CSSProperties } from "react";
-import { Activity, Zap, XCircle, Loader2, AlertTriangle, SkipForward, RefreshCw, Play, TrendingUp } from "lucide-react";
+import { Activity, Zap, XCircle, Loader2, AlertTriangle, SkipForward, RefreshCw, Play, TrendingUp, CheckCircle2 } from "lucide-react";
 import styles from "./ActiveTrade.module.scss";
 import type { ActiveTrade as ActiveTradeType, WaitingTrade } from "../store/TradeStore";
 import { useTradeStore } from "../store/TradeStore";
 import { BASE_PATH } from "@/lib/basePath";
 import { sortSymbolsByPairs } from "@/lib/symbol-sort";
+import { AutoTriggerRow, AutoExecuteExitRow } from "./TriggerRows";
 
 function TradeLogsConsole({ logs }: { logs: string[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,16 +56,53 @@ function TradeLogsConsole({ logs }: { logs: string[] }) {
   );
 }
 
-const ceBadge = (
-  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 3, marginLeft: 2, flexShrink: 0 }}>
-    <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,1 11,11 1,11" fill="#2e9e2e" /></svg>
-  </span>
-);
-const peBadge = (
-  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, borderRadius: 3, marginLeft: 2, flexShrink: 0 }}>
-    <svg width="12" height="12" viewBox="0 0 12 12"><polygon points="6,11 11,1 1,1" fill="#ff0000" /></svg>
-  </span>
-);
+function renderSymbolWithBadge(symbol: string) {
+  if (symbol.endsWith("CE")) {
+    const prefix = symbol.slice(0, -2);
+    return (
+      <span>
+        {prefix}
+        <span
+          style={{
+            backgroundColor: "#16a34a",
+            color: "#ffffff",
+            padding: "1px 4px",
+            borderRadius: 3,
+            fontWeight: 700,
+            marginLeft: 2,
+            display: "inline-block",
+            lineHeight: 1.1,
+          }}
+        >
+          CE
+        </span>
+      </span>
+    );
+  }
+  if (symbol.endsWith("PE")) {
+    const prefix = symbol.slice(0, -2);
+    return (
+      <span>
+        {prefix}
+        <span
+          style={{
+            backgroundColor: "#dc2626",
+            color: "#ffffff",
+            padding: "1px 4px",
+            borderRadius: 3,
+            fontWeight: 700,
+            marginLeft: 2,
+            display: "inline-block",
+            lineHeight: 1.1,
+          }}
+        >
+          PE
+        </span>
+      </span>
+    );
+  }
+  return <span>{symbol}</span>;
+}
 
 const cardStyle: CSSProperties = {
   border: "1px solid var(--theme-popup-field-border)",
@@ -220,7 +258,7 @@ export default function ActiveTradesDesktop({
         <div
           className={styles.activeTrades}
           style={{
-            gridTemplateColumns: "repeat(auto-fill, minmax(460px, 1fr))",
+            gridTemplateColumns: "1fr",
             gap: 14,
             alignItems: "start",
           }}
@@ -230,9 +268,7 @@ export default function ActiveTradesDesktop({
             <div key={t.symbol} className={styles.trade} style={cardStyle}>
               <div className={styles.tradeRow}>
                 <div className={styles.tradeSymbol} style={{ fontWeight: 700 }}>
-                  {t.symbol}
-                  {t.symbol.endsWith("CE") && ceBadge}
-                  {t.symbol.endsWith("PE") && peBadge}
+                  {renderSymbolWithBadge(t.symbol)}
                   {renderSignalIcon(t.symbol)}
                   {renderAiRegimeBadge(t.symbol)}
                 </div>
@@ -482,6 +518,14 @@ export default function ActiveTradesDesktop({
                 </div>
               )}
 
+              {forceBuyEnabled && (
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 10, borderTop: "1px solid var(--theme-border-light)", paddingTop: 10 }}>
+                  <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoTriggerBuyPrice={t.autoTriggerBuyPrice} />
+                  <span style={{ width: 1, alignSelf: "stretch", background: "var(--theme-border-light)" }} />
+                  <AutoExecuteExitRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoExecuteExitPrice={t.autoExecuteExitPrice} />
+                </div>
+              )}
+
               {/* Trade Configuration */}
               <div className={styles.tradeConfig}>
                 <div className="text-xs" style={{ color: "var(--theme-text-gray-500)" }}>
@@ -521,9 +565,7 @@ export default function ActiveTradesDesktop({
                   </div>
                   <div className={styles.bannerBottom}>
                     <span className={styles.bannerSymbol} style={{ color: "#f59e0b" }}>
-                      {t.symbol}
-                      {t.symbol.endsWith("CE") && ceBadge}
-                      {t.symbol.endsWith("PE") && peBadge}
+                      {renderSymbolWithBadge(t.symbol)}
                     </span>
                     <div className={styles.bannerActions}>
                       <button
@@ -595,9 +637,7 @@ export default function ActiveTradesDesktop({
                   </div>
                   <div className={styles.bannerBottom}>
                     <span className={styles.bannerSymbol}>
-                      {t.symbol}
-                      {t.symbol.endsWith("CE") && ceBadge}
-                      {t.symbol.endsWith("PE") && peBadge}
+                      {renderSymbolWithBadge(t.symbol)}
                     </span>
                     <div className={styles.bannerActions}>
                       <button
@@ -652,9 +692,7 @@ export default function ActiveTradesDesktop({
               <div key={index} className={styles.trade} style={cardStyle}>
                 <div className={styles.tradeRow}>
                   <div className={styles.tradeSymbol} style={{ fontWeight: 700 }}>
-                    {t.symbol}
-                    {t.symbol.endsWith("CE") && ceBadge}
-                    {t.symbol.endsWith("PE") && peBadge}
+                    {renderSymbolWithBadge(t.symbol)}
                     {renderSignalIcon(t.symbol)}
                     {renderAiRegimeBadge(t.symbol)}
                     {(() => {
@@ -718,7 +756,7 @@ export default function ActiveTradesDesktop({
                   </button>
                   )}
                   <button
-                    className={`${styles.waitingBtn} ${styles.danger}`}
+                    className={`${styles.waitingBtn} ${styles.cancel}`}
                     type="button"
                     onClick={() => {
                       fetch(`${BASE_PATH}/api/trades/${encodeURIComponent(t.symbol)}/cancel`, { method: "POST" }).catch(() => {});
@@ -810,6 +848,12 @@ export default function ActiveTradesDesktop({
                     </div>
                   );
                 })()}
+
+                {forceBuyEnabled && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 10, borderTop: "1px solid var(--theme-border-light)", paddingTop: 10 }}>
+                    <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={false} autoTriggerBuyPrice={t.autoTriggerBuyPrice} />
+                  </div>
+                )}
 
                 {/* Trade Configuration for Waiting Trades */}
                 <div className={styles.tradeConfig}>
