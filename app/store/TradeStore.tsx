@@ -23,6 +23,7 @@ export type WaitingTrade = {
   stopLossNumber: number;
   trailingStopLossEnabled: boolean;
   trailingStopLossSteps: number;
+  slMode?: "live" | "candleClose";
   targetPointsEnabled: boolean;
   targetPoints: number;
   targetMode: "live" | "candleClose";
@@ -52,6 +53,7 @@ export type WaitingTrade = {
   reEntryStartCandle: number;
   reEntryCandles: number;
   reEntryPoints: number;
+  reEntryPeakCandles?: number;
   reEntryStopLossEnabled: boolean;
   reEntryStopLoss: number;
   reEntryAsTrailingEnabled: boolean;
@@ -70,6 +72,7 @@ export type WaitingTrade = {
   triggerSeconds?: number;
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
+  autoTriggerBuyPrice?: number;
 };
 export type ActiveTrade = {
   symbol: string;
@@ -83,6 +86,7 @@ export type ActiveTrade = {
   stopLossNumber: number;
   trailingStopLossEnabled: boolean;
   trailingStopLossSteps: number;
+  slMode?: "live" | "candleClose";
   targetPointsEnabled: boolean;
   targetPoints: number;
   targetMode: "live" | "candleClose";
@@ -124,6 +128,7 @@ export type ActiveTrade = {
   reEntryStartCandle: number;
   reEntryCandles: number;
   reEntryPoints: number;
+  reEntryPeakCandles?: number;
   reEntryStopLossEnabled: boolean;
   reEntryStopLoss: number;
   reEntryAsTrailingEnabled: boolean;
@@ -147,6 +152,8 @@ export type ActiveTrade = {
   triggerSeconds?: number;
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
+  autoTriggerBuyPrice?: number;
+  autoExecuteExitPrice?: number;
 };
 
 export type AiSuggestion = {
@@ -343,14 +350,16 @@ export function TradeStoreProvider({
   children: React.ReactNode;
 }) {
   const [selection, setSelection] = useState<TradeSelection>(null);
-  const [forceBuyEnabled, setForceBuyEnabled] = useState(false);
+  const [forceBuyEnabled, setForceBuyEnabledState] = useState(false);
   const [desktopViewEnabled, setDesktopViewEnabledState] = useState(false);
 
-  // Hydrate desktop view preference from localStorage (client-only)
+  // Hydrate desktop view + force buy preferences from localStorage (client-only)
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDesktopViewEnabledState(localStorage.getItem("dummy_desktopView") === "1");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForceBuyEnabledState(localStorage.getItem("dummy_forceBuy") === "1");
     } catch {}
   }, []);
 
@@ -358,6 +367,13 @@ export function TradeStoreProvider({
     setDesktopViewEnabledState(v);
     try {
       localStorage.setItem("dummy_desktopView", v ? "1" : "0");
+    } catch {}
+  }, []);
+
+  const setForceBuyEnabled = useCallback((v: boolean) => {
+    setForceBuyEnabledState(v);
+    try {
+      localStorage.setItem("dummy_forceBuy", v ? "1" : "0");
     } catch {}
   }, []);
 
@@ -449,6 +465,7 @@ export function TradeStoreProvider({
       stopLossNumber: readFormNumber(sym, "stopLossNumber", 15),
       trailingStopLossEnabled: readFormBool(sym, "trailingStopLossEnabled", false),
       trailingStopLossSteps: readFormNumber(sym, "trailingStopLossSteps", 5),
+      slMode: readFormString(sym, "slMode", "live") as "live" | "candleClose",
       targetPointsEnabled: readFormBool(sym, "targetPointsEnabled", true),
       targetPoints: readFormNumber(sym, "targetPoints", 20),
       targetMode: readFormString(sym, "targetMode", "live") as "live" | "candleClose",
@@ -489,6 +506,7 @@ export function TradeStoreProvider({
       reEntryStartCandle: readFormNumber(sym, "reEntryStartCandle", 1),
       reEntryCandles: readFormNumber(sym, "reEntryCandles", 5),
       reEntryPoints: readFormNumber(sym, "reEntryPoints", 3),
+      reEntryPeakCandles: readFormNumber(sym, "reEntryPeakCandles", 30),
       reEntryStopLossEnabled: readFormBool(sym, "reEntryStopLossEnabled", true),
       reEntryStopLoss: readFormNumber(sym, "reEntryStopLoss", 5),
       reEntryAsTrailingEnabled: readFormBool(sym, "reEntryAsTrailingEnabled", true),
@@ -599,6 +617,7 @@ export function TradeStoreProvider({
       reEntryStartCandle: tradeToActivate.reEntryStartCandle ?? 1,
       reEntryCandles: tradeToActivate.reEntryCandles,
       reEntryPoints: tradeToActivate.reEntryPoints,
+      reEntryPeakCandles: tradeToActivate.reEntryPeakCandles ?? 30,
       reEntryStopLossEnabled: tradeToActivate.reEntryStopLossEnabled,
       reEntryStopLoss: tradeToActivate.reEntryStopLoss,
       reEntryAsTrailingEnabled: tradeToActivate.reEntryAsTrailingEnabled,
