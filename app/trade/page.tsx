@@ -1615,6 +1615,7 @@ export default function TradePage() {
                         trailingStopLossSteps,
                         stopLossPercentageEnabled,
                         stopLossPercentage,
+                        slMode,
                         targetPointsEnabled,
                         targetPoints,
                         targetMode,
