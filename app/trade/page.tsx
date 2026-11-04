@@ -1613,6 +1613,8 @@ export default function TradePage() {
                         stopLossNumber,
                         trailingStopLossEnabled,
                         trailingStopLossSteps,
+                        stopLossPercentageEnabled,
+                        stopLossPercentage,
                         targetPointsEnabled,
                         targetPoints,
                         targetMode,
