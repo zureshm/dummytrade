@@ -591,6 +591,8 @@ export interface WatchdogCheckpoint {
 export interface WatchdogSettings {
   watchdogEnabled: boolean;
   watchdogCheckpoints: WatchdogCheckpoint[];
+  watchdogSlEnabled: boolean;
+  watchdogSlPoints: number;
 }
 
 const DEFAULT_WATCHDOG_CHECKPOINTS: WatchdogCheckpoint[] = [
@@ -608,17 +610,27 @@ const DEFAULT_WATCHDOG_CHECKPOINTS: WatchdogCheckpoint[] = [
 
 let watchdogEnabled = false;
 let watchdogCheckpoints: WatchdogCheckpoint[] = JSON.parse(JSON.stringify(DEFAULT_WATCHDOG_CHECKPOINTS));
+let watchdogSlEnabled = false;
+let watchdogSlPoints = 15;
 
 export function getWatchdogSettings(): WatchdogSettings {
   return {
     watchdogEnabled,
     watchdogCheckpoints: JSON.parse(JSON.stringify(watchdogCheckpoints)),
+    watchdogSlEnabled,
+    watchdogSlPoints,
   };
 }
 
 export function setWatchdogSettings(settings: Partial<WatchdogSettings>) {
   if (typeof settings.watchdogEnabled === "boolean") {
     watchdogEnabled = settings.watchdogEnabled;
+  }
+  if (typeof settings.watchdogSlEnabled === "boolean") {
+    watchdogSlEnabled = settings.watchdogSlEnabled;
+  }
+  if (typeof settings.watchdogSlPoints === "number" && Number.isFinite(settings.watchdogSlPoints)) {
+    watchdogSlPoints = Math.max(0, settings.watchdogSlPoints);
   }
   if (Array.isArray(settings.watchdogCheckpoints)) {
     watchdogCheckpoints = settings.watchdogCheckpoints.slice(0, DEFAULT_WATCHDOG_CHECKPOINTS.length).map((cp, idx) => ({
@@ -964,6 +976,8 @@ function loadState() {
       if (typeof data.autoCutoffAmpm === "string") autoCutoffAmpm = data.autoCutoffAmpm;
 
       if (typeof data.watchdogEnabled === "boolean") watchdogEnabled = data.watchdogEnabled;
+      if (typeof data.watchdogSlEnabled === "boolean") watchdogSlEnabled = data.watchdogSlEnabled;
+      if (typeof data.watchdogSlPoints === "number" && Number.isFinite(data.watchdogSlPoints)) watchdogSlPoints = Math.max(0, data.watchdogSlPoints);
       if (Array.isArray(data.watchdogCheckpoints)) {
         watchdogCheckpoints = data.watchdogCheckpoints.slice(0, DEFAULT_WATCHDOG_CHECKPOINTS.length).map((cp: { points?: unknown; breakBelow?: unknown }, idx: number) => ({
           points: typeof cp.points === "number" ? cp.points : (DEFAULT_WATCHDOG_CHECKPOINTS[idx]?.points ?? 0),
@@ -1061,6 +1075,8 @@ function persistState() {
       autoCutoffAmpm,
       watchdogEnabled,
       watchdogCheckpoints,
+      watchdogSlEnabled,
+      watchdogSlPoints,
       niftySignalBinding,
       symbolsWithFirstSignal: [...symbolsWithFirstSignal],
       symbolHistoryStatus,
@@ -4032,6 +4048,21 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
       const currentMaxGain = Math.max(trade.watchdogMaxGain ?? 0, currentGain);
       if (currentMaxGain > (trade.watchdogMaxGain ?? 0)) {
         updateWatchdogState(trade.symbol, currentMaxGain);
+      }
+
+      // ── Negative Scenario: SL Trigger Checkpoint ──
+      if (watchdogSlEnabled && watchdogSlPoints > 0) {
+        if (currentGain <= -watchdogSlPoints) {
+          const exitPrice = ltp;
+          triggeredPositions.add(positionKey);
+          trailingArmedPositions.delete(positionKey);
+          completeCycleWithoutExit(
+            trade.symbol,
+            String(exitPrice),
+            `WATCHDOG SL exit triggered for ₹${exitPrice.toFixed(2)} (dropped ${Math.abs(currentGain).toFixed(2)} pts backwards from entry ₹${entry.toFixed(2)}, SL trigger: -${watchdogSlPoints} pts) at ${currentTime} (LTP)`
+          );
+          continue;
+        }
       }
 
       let reachedCp: WatchdogCheckpoint | null = null;
