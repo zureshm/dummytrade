@@ -301,6 +301,7 @@ type WaitingTrade = {
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
   autoTriggerBuyPrice?: number;
+  autoTriggerBuyMode?: "on" | "below";
 };
 
 type ActiveTrade = {
@@ -388,6 +389,7 @@ type ActiveTrade = {
   triggerMinPrice?: number;
   triggerMaxPrice?: number;
   autoTriggerBuyPrice?: number;
+  autoTriggerBuyMode?: "on" | "below";
   autoExecuteExitPrice?: number;
   autoExecuteExitDir?: "up" | "down";
 };
@@ -4617,13 +4619,15 @@ async function tick() {
 
             // Check waiting trades
             const waiting = waitingTrades.find((t) => t.symbol === p.symbol && t.autoTriggerBuyPrice != null);
-            if (waiting && waiting.autoTriggerBuyPrice != null && currentLtp >= waiting.autoTriggerBuyPrice) {
+            const waitingMode = waiting?.autoTriggerBuyMode ?? "on";
+            if (waiting && waiting.autoTriggerBuyPrice != null && (waitingMode === "below" ? currentLtp <= waiting.autoTriggerBuyPrice : currentLtp >= waiting.autoTriggerBuyPrice)) {
               const targetPrice = waiting.autoTriggerBuyPrice;
               delete waiting.autoTriggerBuyPrice;
+              delete waiting.autoTriggerBuyMode;
               const ltpStr = String(currentLtp);
               const now = new Date();
               const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-              const logLine = `AUTO TRIGGER BUY triggered for ₹${ltpStr} (exceeded ₹${targetPrice}) at ${timeStr}`;
+              const logLine = `AUTO TRIGGER BUY triggered for ₹${ltpStr} (${waitingMode === "below" ? "dropped to" : "exceeded"} ₹${targetPrice}) at ${timeStr}`;
               console.log(`[trade-engine] ${waiting.symbol}: ${logLine}`);
               activateWaitingTrade(waiting.symbol, ltpStr, logLine);
               delete pendingBuyBuffer[waiting.symbol];
@@ -4633,13 +4637,15 @@ async function tick() {
 
             // Check active trades (between cycles / not in position)
             const active = activeTrades.find((t) => t.symbol === p.symbol && t.status === "ACTIVE" && !t.inPosition && t.autoTriggerBuyPrice != null);
-            if (active && active.autoTriggerBuyPrice != null && currentLtp >= active.autoTriggerBuyPrice) {
+            const activeMode = active?.autoTriggerBuyMode ?? "on";
+            if (active && active.autoTriggerBuyPrice != null && (activeMode === "below" ? currentLtp <= active.autoTriggerBuyPrice : currentLtp >= active.autoTriggerBuyPrice)) {
               const targetPrice = active.autoTriggerBuyPrice;
               delete active.autoTriggerBuyPrice;
+              delete active.autoTriggerBuyMode;
               const ltpStr = String(currentLtp);
               const now = new Date();
               const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-              const logLine = `AUTO TRIGGER BUY triggered for ₹${ltpStr} (exceeded ₹${targetPrice}) at ${timeStr}`;
+              const logLine = `AUTO TRIGGER BUY triggered for ₹${ltpStr} (${activeMode === "below" ? "dropped to" : "exceeded"} ₹${targetPrice}) at ${timeStr}`;
               console.log(`[trade-engine] ${active.symbol}: ${logLine}`);
               updateActiveTradeBuy(active.symbol, ltpStr, logLine);
               delete pendingBuyBuffer[active.symbol];
@@ -5046,18 +5052,22 @@ export async function manualEndCycle(symbol: string) {
   persistState();
 }
 
-export function setAutoTriggerBuyPrice(symbol: string, triggerPrice: number): boolean {
+export function setAutoTriggerBuyPrice(symbol: string, triggerPrice: number, mode?: "on" | "below"): boolean {
+  const dir = mode === "below" ? "below" : "on";
+  const modeLabel = dir === "below" ? "BELOW" : "ON";
   const waiting = waitingTrades.find((t) => t.symbol === symbol);
   if (waiting) {
     waiting.autoTriggerBuyPrice = triggerPrice;
-    addLogToWaiting(symbol, `Auto Trigger Buy set to ₹${triggerPrice}`);
+    waiting.autoTriggerBuyMode = dir;
+    addLogToWaiting(symbol, `Auto Trigger Buy set to ₹${triggerPrice} (${modeLabel})`);
     persistState();
     return true;
   }
   const active = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE");
   if (active) {
     active.autoTriggerBuyPrice = triggerPrice;
-    addLogToActive(symbol, `Auto Trigger Buy set to ₹${triggerPrice}`);
+    active.autoTriggerBuyMode = dir;
+    addLogToActive(symbol, `Auto Trigger Buy set to ₹${triggerPrice} (${modeLabel})`);
     persistState();
     return true;
   }
@@ -5068,6 +5078,7 @@ export function resetAutoTriggerBuyPrice(symbol: string): boolean {
   const waiting = waitingTrades.find((t) => t.symbol === symbol);
   if (waiting) {
     delete waiting.autoTriggerBuyPrice;
+    delete waiting.autoTriggerBuyMode;
     addLogToWaiting(symbol, `Auto Trigger Buy reset (cleared)`);
     persistState();
     return true;
@@ -5075,6 +5086,7 @@ export function resetAutoTriggerBuyPrice(symbol: string): boolean {
   const active = activeTrades.find((t) => t.symbol === symbol && t.status === "ACTIVE");
   if (active) {
     delete active.autoTriggerBuyPrice;
+    delete active.autoTriggerBuyMode;
     addLogToActive(symbol, `Auto Trigger Buy reset (cleared)`);
     persistState();
     return true;

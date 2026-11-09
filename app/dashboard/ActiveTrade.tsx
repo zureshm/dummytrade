@@ -519,7 +519,7 @@ export default function ActiveTrade({
                   border: "1px solid var(--theme-popup-field-border)",
                   background: "var(--theme-popup-field-bg)",
                 }}>
-                  <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoTriggerBuyPrice={t.autoTriggerBuyPrice} labelOnTop />
+                  <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoTriggerBuyPrice={t.autoTriggerBuyPrice} autoTriggerBuyMode={t.autoTriggerBuyMode} labelOnTop />
                   <AutoExecuteExitRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoExecuteExitPrice={t.autoExecuteExitPrice} labelOnTop />
                 </div>
               )}
@@ -854,7 +854,7 @@ export default function ActiveTrade({
                     border: "1px solid var(--theme-popup-field-border)",
                     background: "var(--theme-popup-field-bg)",
                   }}>
-                    <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={false} autoTriggerBuyPrice={t.autoTriggerBuyPrice} labelOnTop />
+                    <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={false} autoTriggerBuyPrice={t.autoTriggerBuyPrice} autoTriggerBuyMode={t.autoTriggerBuyMode} labelOnTop />
                   </div>
                 )}
 
