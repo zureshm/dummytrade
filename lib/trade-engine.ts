@@ -2799,15 +2799,8 @@ function handleStrategySignal(signal: any) {
 
 
   if (candleTime) {
-
-
-
     lastStrategyCandleTime = candleTime;
-
     if (signalSymbol) lastCandleTimeMap[signalSymbol] = candleTime;
-
-
-
   }
 
   // A trade bought before its first observed signal since (re-)add gets its
@@ -4117,18 +4110,19 @@ function handleLtpMonitoring(ltpMap: Record<string, number>) {
       }
     }
 
-    // Log the SL floor once per change — "SL set at" on each entry/cycle,
-    // "SL trailed to" when trailing steps or pct ratchet it upward.
+    // Log the SL floor once on activation — upward ratchet updates are
+    // suppressed to avoid per-tick log spam. A level drop means a new
+    // entry/cycle, so the fresh level is logged once again.
     if (effectiveSLEnabled && (effectiveSL > 0 || (trade.stopLossPercentageEnabled && (trade.stopLossPercentage ?? 0) > 0))) {
       const prevLogged = lastLoggedSlLevel[trade.symbol];
-      if (prevLogged === undefined || Math.abs(trailedSLLevel - prevLogged) >= 0.01) {
+      if (prevLogged === undefined || trailedSLLevel < prevLogged - 0.01) {
         const pct = trade.stopLossPercentage ?? 0;
         const basis = trade.stopLossPercentageEnabled && pct > 0
           ? `${pct}% below ₹${entry.toFixed(2)} entry`
           : `${(effectiveSL || 0)} pts below ₹${entry.toFixed(2)} entry`;
-        addLogToActive(trade.symbol, `${prevLogged === undefined ? "SL set" : "SL trailed"} at ₹${trailedSLLevel.toFixed(2)} (${basis}) at ${currentTime}`);
-        lastLoggedSlLevel[trade.symbol] = trailedSLLevel;
+        addLogToActive(trade.symbol, `SL set at ₹${trailedSLLevel.toFixed(2)} (${basis}) at ${currentTime}`);
       }
+      lastLoggedSlLevel[trade.symbol] = trailedSLLevel;
     } else {
       delete lastLoggedSlLevel[trade.symbol];
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { HelpCircle, ShieldAlert, Clock, Target, RefreshCw, Timer } from "lucide-react";
+import { HelpCircle, ShieldAlert, Clock, Target, RefreshCw, Timer, Plus, Minus } from "lucide-react";
 import { useTradeStore, WaitingTrade } from "../store/TradeStore";
 import { useRouter } from "next/navigation";
 import { getPrices } from "@/lib/getPrices";
@@ -1569,15 +1569,35 @@ export default function TradePage() {
 
               <div className="flex justify-between items-center mb-2">
                 <label className="text-sm">LOT ({lotSize}):</label>
-                <NumericInput
-                  value={lotValue}
-                  onChange={setLotValue}
-                  fallback="1"
-                  data-lot-input="true"
-                  data-slot="trade-lot-input"
-                  className={`w-16 h-8 text-sm trade-lot-input ${isAlreadyActive ? "opacity-50 cursor-not-allowed" : ""}`}
-                  disabled={!!isAlreadyActive}
-                />
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!!isAlreadyActive || lotValue <= 1}
+                    onClick={() => setLotValue((v) => Math.max(1, (v || 1) - 1))}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+                    title="Decrease Lot"
+                  >
+                    <Minus className="w-4 h-4 stroke-[2.5] text-white" />
+                  </button>
+                  <NumericInput
+                    value={lotValue}
+                    onChange={setLotValue}
+                    fallback="1"
+                    data-lot-input="true"
+                    data-slot="trade-lot-input"
+                    className={`w-16 h-8 text-sm text-center trade-lot-input ${isAlreadyActive ? "opacity-50 cursor-not-allowed" : ""}`}
+                    disabled={!!isAlreadyActive}
+                  />
+                  <button
+                    type="button"
+                    disabled={!!isAlreadyActive}
+                    onClick={() => setLotValue((v) => (v || 0) + 1)}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+                    title="Increase Lot"
+                  >
+                    <Plus className="w-4 h-4 stroke-[2.5] text-white" />
+                  </button>
+                </div>
               </div>
 
               <div className="text-sm text-gray-600" style={{ color: "var(--theme-text-secondary, #4b5563)" }}>
