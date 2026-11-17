@@ -520,7 +520,7 @@ export default function ActiveTradesDesktop({
 
               {forceBuyEnabled && (
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 10, borderTop: "1px solid var(--theme-border-light)", paddingTop: 10 }}>
-                  <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoTriggerBuyPrice={t.autoTriggerBuyPrice} />
+                  <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoTriggerBuyPrice={t.autoTriggerBuyPrice} autoTriggerBuyMode={t.autoTriggerBuyMode} />
                   <span style={{ width: 1, alignSelf: "stretch", background: "var(--theme-border-light)" }} />
                   <AutoExecuteExitRow symbol={t.symbol} activeLtps={activeLtps} inPosition={t.inPosition} autoExecuteExitPrice={t.autoExecuteExitPrice} />
                 </div>
@@ -851,7 +851,7 @@ export default function ActiveTradesDesktop({
 
                 {forceBuyEnabled && (
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 10, borderTop: "1px solid var(--theme-border-light)", paddingTop: 10 }}>
-                    <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={false} autoTriggerBuyPrice={t.autoTriggerBuyPrice} />
+                    <AutoTriggerRow symbol={t.symbol} activeLtps={activeLtps} inPosition={false} autoTriggerBuyPrice={t.autoTriggerBuyPrice} autoTriggerBuyMode={t.autoTriggerBuyMode} />
                   </div>
                 )}
 
